@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* Slider and Processing Options Styles */
+.processing-options {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.option-group {
+    margin-bottom: 1.5rem;
+}
+
+.option-group:last-child {
+    margin-bottom: 0;
+}
+
+.option-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+/* Custom Slider Styling */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: linear-gradient(90deg, #2c3e50 0%, #3498db 100%);
+    border-radius: 4px;
+    outline: none;
+    margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3498db;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.8);
+    transform: scale(1.1);
+}
+
+/* Value Display */
+.value-display {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(52, 152, 219, 0.2);
+    border-radius: 20px;
+    color: #3498db;
+    font-weight: 600;
+    margin-left: 10px;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Toggle Switch */
+.switch-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+    margin-right: 10px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #2c3e50;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #3498db;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Noise Controls */
+.noise-controls {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(52, 152, 219, 0.1);
+    border-radius: 8px;
+    display: none;
+}
+
+.noise-controls.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.noise-parameter {
+    margin-bottom: 1rem;
+}
+
+.noise-parameter label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #bdc3c7;
+    font-size: 0.9em;
+}
+
+/* Info Icon */
+.info-icon {
+    display: inline-block;
+    margin-left: 5px;
+    color: #3498db;
+    cursor: help;
+}
+
+.info-icon:hover {
+    color: #2980b9;
+}
+</style>
+
+<section class="process-section">
+    <h1 class="glitch-text" data-text="Fix Your Audio">Fix Your Audio</h1>
+    <p class="section-description">Upload your audio file and the AI will "enhance" it (may take a while)</p>
+    
+    <div class="upload-container">
+        <form action="{{ url_for('process') }}" method="post" enctype="multipart/form-data" id="upload-form">
+            <div class="file-upload">
+                <div class="file-upload-area" id="drop-area">
+                    <input type="file" name="audio_file" id="audio-file" accept=".wav,.mp3,.ogg,.flac" class="file-input" required>
+                    <label for="audio-file" class="file-label">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">
+                            <span class="primary-text">Drag & drop your audio file here</span>
+                            <span class="secondary-text">or click to browse</span>
+                            <span class="file-info" id="file-info">WAV, MP3, OGG, FLAC (Max 16MB)</span>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="selected-file" id="selected-file">
+                    <div class="file-details">
+                        <i class="fas fa-music file-icon"></i>
+                        <span class="file-name" id="file-name">No file selected</span>
+                    </div>
+                    <button type="button" class="remove-file" id="remove-file">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="processing-options">
+                <div class="option-group">
+                    <label for="inference-steps">Inference Steps <span class="value-display" id="steps-display">50</span></label>
+                    <input type="range" id="inference-steps" name="inference_steps" 
+                           min="20" max="100" value="50" step="1">
+                    <small class="help-text">Higher values = better quality but slower processing</small>
+                </div>
+
+                <div class="option-group">
+                    <div class="switch-container">
+                        <label class="switch">
+                            <input type="checkbox" id="enable-noise" name="enable_noise">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Enable Noisy Processing</span>
+                        <i class="fas fa-info-circle info-icon" title="Add noise to the input audio before processing. This can help the model better identify and remove noise patterns."></i>
+                    </div>
+
+                    <div class="noise-controls" id="noise-controls">
+                        <div class="noise-parameter">
+                            <label for="noise-offset">Noise Offset <span class="value-display" id="offset-display">20</span></label>
+                            <input type="range" id="noise-offset" name="noise_offset" 
+                                   min="10" max="30" value="20" step="1">
+                        </div>
+                        
+                        <div class="noise-parameter">
+                            <label for="noise-std">Noise Intensity <span class="value-display" id="std-display">15</span></label>
+                            <input type="range" id="noise-std" name="noise_std" 
+                                   min="5" max="25" value="15" step="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="audio-preview" id="audio-preview">
+                <h3>Preview</h3>
+                <div class="audio-player-container">
+                    <audio id="audio-player" controls></audio>
+                    <div class="audio-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-large process-btn" id="process-btn">
+                <span class="btn-text">Process Audio</span>
+                <span class="btn-icon"><i class="fas fa-magic"></i></span>
+            </button>
+        </form>
+    </div>
+    
+    <!-- Processing overlay -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="processing-content">
+            <div class="processing-spinner">
+                <i class="fas fa-cog fa-spin"></i>
+            </div>
+            <h3>Processing Your Audio</h3>
+            <p id="progress-message">Preparing to process...</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-details">
+                <span id="progress-count"></span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="experimental-notice">
+        <i class="fas fa-flask"></i>
+        <p>This is an experimental AI model, Results may vary!</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    //File upload handling
+    const dropArea = document.getElementById('drop-area');
+    const fileInput = document.getElementById('audio-file');
+    const fileInfo = document.getElementById('file-info');
+    const selectedFile = document.getElementById('selected-file');
+    const fileName = document.getElementById('file-name');
+    const removeFile = document.getElementById('remove-file');
+    const audioPreview = document.getElementById('audio-preview');
+    const audioPlayer = document.getElementById('audio-player');
+    const uploadForm = document.getElementById('upload-form');
+    const processBtn = document.getElementById('process-btn');
+    const processingOverlay = document.getElementById('processing-overlay');
+    const progressFill = document.getElementById('progress-fill');
+    const visualizerBars = document.querySelectorAll('.visualizer-bar');
+    
+    //Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    //Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight() {
+        dropArea.classList.add('highlight');
+    }
+    
+    function unhighlight() {
+        dropArea.classList.remove('highlight');
+    }
+    
+    //Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length) {
+            fileInput.files = files;
+            updateFileInfo();
+        }
+    }
+    
+    //Handle selected files
+    fileInput.addEventListener('change', updateFileInfo);
+    
+    function updateFileInfo() {
+        if (fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            
+            //Check file type
+            const fileType = file.type;
+            if (!fileType.match('audio.*')) {
+                alert('Please select an audio file');
+                resetFileInput();
+                return;
+            }
+            
+            //Check file size (max 16MB)
+            if (file.size > 16 * 1024 * 1024) {
+                alert('File size exceeds 16MB limit');
+                resetFileInput();
+                return;
+            }
+            
+            //Update UI
+            fileName.textContent = file.name;
+            selectedFile.classList.add('active');
+            
+            //Create audio preview
+            const url = URL.createObjectURL(file);
+            audioPlayer.src = url;
+            audioPreview.classList.add('active');
+            
+            //Start visualizer animation
+            startVisualizer();
+        }
+    }
+    
+    //Remove selected file
+    removeFile.addEventListener('click', resetFileInput);
+    
+    function resetFileInput() {
+        fileInput.value = '';
+        selectedFile.classList.remove('active');
+        audioPreview.classList.remove('active');
+        audioPlayer.src = '';
+        stopVisualizer();
+    }
+    
+    //Audio visualizer animation
+    let visualizerInterval;
+    
+    function startVisualizer() {
+        if (visualizerInterval) clearInterval(visualizerInterval);
+        
+        visualizerInterval = setInterval(() => {
+            visualizerBars.forEach(bar => {
+                const height = Math.floor(Math.random() * 100);
+                bar.style.height = `${height}%`;
+            });
+        }, 100);
+    }
+    
+    function stopVisualizer() {
+        if (visualizerInterval) {
+            clearInterval(visualizerInterval);
+            visualizerBars.forEach(bar => {
+                bar.style.height = '10%';
+            });
+        }
+    }
+    
+    function startProgressMonitoring() {
+        const eventSource = new EventSource('/progress');
+        const progressMessage = document.getElementById('progress-message');
+        const progressCount = document.getElementById('progress-count');
+        const progressFill = document.getElementById('progress-fill');
+        
+        eventSource.onmessage = function(e) {
+            try {
+                const progress = JSON.parse(e.data);
+                
+                //Update progress bar
+                if (progress.total > 0) {
+                    const percent = (progress.current / progress.total) * 100;
+                    progressFill.style.width = `${percent}%`;
+                }
+                
+                //Update message
+                if (progress.message) {
+                    progressMessage.textContent = progress.message;
+                }
+                
+                //Update count
+                if (progress.current !== undefined && progress.total !== undefined) {
+                    progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
+                }
+                
+                //Close connection when done
+                if (progress.done) {
+                    eventSource.close();
+                }
+                
+                //Force DOM update
+                progressMessage.style.display = 'none';
+                progressMessage.offsetHeight; //Force reflow
+                progressMessage.style.display = 'block';
+                
+                progressCount.style.display = 'none';
+                progressCount.offsetHeight; //Force reflow
+                progressCount.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error parsing progress data:', error);
+            }
+        };
+        
+        eventSource.onerror = function(e) {
+            console.error('EventSource failed:', e);
+            eventSource.close();
+        };
+    }
+    
+    //Update form submit handler
+    uploadForm.addEventListener('submit', function(e) {
+        if (!fileInput.files || !fileInput.files[0]) {
+            e.preventDefault();
+            alert('Please select an audio file first');
+            return;
+        }
+        
+        //Reset progress elements
+        document.getElementById('progress-message').textContent = 'Preparing to process...';
+        document.getElementById('progress-count').textContent = '';
+        document.getElementById('progress-fill').style.width = '0%';
+        
+        processingOverlay.classList.add('active');
+        startProgressMonitoring();
+    });
+    
+    //Audio player events
+    audioPlayer.addEventListener('play', startVisualizer);
+    audioPlayer.addEventListener('pause', stopVisualizer);
+    audioPlayer.addEventListener('ended', stopVisualizer);
+    
+    const stepsSlider = document.getElementById('inference-steps');
+    const stepsValue = document.getElementById('steps-value');
+    
+    stepsSlider.addEventListener('input', (e) => {
+        stepsValue.textContent = e.target.value;
+    });
+    
+    // Add new script for handling noise controls
+    const enableNoise = document.getElementById('enable-noise');
+    const noiseControls = document.getElementById('noise-controls');
+    const noiseOffset = document.getElementById('noise-offset');
+    const noiseStd = document.getElementById('noise-std');
+    const stepsDisplay = document.getElementById('steps-display');
+    const offsetDisplay = document.getElementById('offset-display');
+    const stdDisplay = document.getElementById('std-display');
+    
+    // Toggle noise controls visibility
+    enableNoise.addEventListener('change', function() {
+        noiseControls.classList.toggle('active', this.checked);
+    });
+    
+    // Update value displays
+    function updateValueDisplay(input, display) {
+        display.textContent = input.value;
+    }
+    
+    document.getElementById('inference-steps').addEventListener('input', function() {
+        updateValueDisplay(this, stepsDisplay);
+    });
+    
+    noiseOffset.addEventListener('input', function() {
+        updateValueDisplay(this, offsetDisplay);
+    });
+    
+    noiseStd.addEventListener('input', function() {
+        updateValueDisplay(this, stdDisplay);
+    });
+    
+    // Initialize value displays
+    updateValueDisplay(document.getElementById('inference-steps'), stepsDisplay);
+    updateValueDisplay(noiseOffset, offsetDisplay);
+    updateValueDisplay(noiseStd, stdDisplay);
+</script>
+{% endblock %} 
