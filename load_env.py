@@ -32,7 +32,7 @@ def load_dotenv(dotenv_path=None):
             key = key.strip()
             value = value.strip()
             
-            # Remove quotes if present
+            #Remove quotes if present
             if value and value[0] == value[-1] and value[0] in ('"', "'"):
                 value = value[1:-1]
             
