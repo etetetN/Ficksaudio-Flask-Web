@@ -717,61 +717,94 @@ input:checked + .slider:before {
         // First, try to use EventSource (SSE) which works best on local development
         let usePolling = false;
         let sseTimeout;
-        
-        // Set a timeout to switch to polling if SSE doesn't work or respond within 3 seconds
-        sseTimeout = setTimeout(() => {
-            console.log("SSE not responding in time, switching to polling");
+        let eventSource = null;
+        let pollingInterval = null;
+
+        // On PythonAnywhere, polling every 2-3 seconds is more reliable than SSE
+        // Check if we're on PythonAnywhere by looking for its domain in the URL
+        if (window.location.hostname.includes('pythonanywhere.com')) {
+            console.log("Detected PythonAnywhere environment, using polling by default");
             usePolling = true;
             setupPolling();
-        }, 3000);
-        
-        try {
-            const eventSource = new EventSource('/progress');
+        } else {
+            // On other environments, try SSE first with a timeout fallback
+            console.log("Attempting to use SSE with polling fallback");
             
-            eventSource.onopen = function() {
-                // SSE connection established successfully, cancel the timeout
-                clearTimeout(sseTimeout);
-                console.log("SSE connection established");
-            };
-            
-            eventSource.onmessage = function(e) {
-                // SSE is working, cancel the timeout if it's still active
-                clearTimeout(sseTimeout);
+            // Set a timeout to switch to polling if SSE doesn't work or respond within 5 seconds
+            sseTimeout = setTimeout(() => {
+                console.log("SSE not responding in time, switching to polling");
+                usePolling = true;
                 
-                try {
-                    const progress = JSON.parse(e.data);
-                    updateProgressUI(progress);
+                // Close the existing EventSource if it exists
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                
+                setupPolling();
+            }, 5000);
+            
+            try {
+                eventSource = new EventSource('/progress');
+                
+                eventSource.onopen = function() {
+                    // SSE connection established successfully, cancel the timeout
+                    clearTimeout(sseTimeout);
+                    console.log("SSE connection established");
+                };
+                
+                eventSource.onmessage = function(e) {
+                    // SSE is working, cancel the timeout if it's still active
+                    clearTimeout(sseTimeout);
                     
-                    // Close connection when done
-                    if (progress.done) {
-                        eventSource.close();
+                    try {
+                        const progress = JSON.parse(e.data);
+                        updateProgressUI(progress);
                         
-                        // Redirect to results page after a short delay
-                        checkAndRedirectToResults();
+                        // Handle reconnect request or stream timeout
+                        if (progress.reconnect) {
+                            console.log("Server requested reconnection, switching to polling");
+                            eventSource.close();
+                            setupPolling();
+                            return;
+                        }
+                        
+                        // Close connection when done
+                        if (progress.done || progress.status === 'completed') {
+                            eventSource.close();
+                            
+                            // Redirect to results page after a short delay
+                            checkAndRedirectToResults();
+                        }
+                    } catch (error) {
+                        console.error('Error parsing progress data:', error);
                     }
-                } catch (error) {
-                    console.error('Error parsing progress data:', error);
-                }
-            };
-            
-            eventSource.onerror = function(e) {
-                console.error('EventSource failed:', e);
-                eventSource.close();
+                };
                 
-                // Fall back to polling
-                if (!usePolling) {
-                    usePolling = true;
-                    setupPolling();
-                }
-            };
-        } catch (error) {
-            console.error('Error setting up EventSource:', error);
-            // Fall back to polling immediately
-            usePolling = true;
-            setupPolling();
+                eventSource.onerror = function(e) {
+                    console.error('EventSource failed:', e);
+                    
+                    // Close the connection on error
+                    eventSource.close();
+                    eventSource = null;
+                    
+                    // Fall back to polling
+                    if (!usePolling) {
+                        usePolling = true;
+                        setupPolling();
+                    }
+                };
+            } catch (error) {
+                console.error('Error setting up EventSource:', error);
+                // Fall back to polling immediately
+                usePolling = true;
+                setupPolling();
+            }
         }
         
         function updateProgressUI(progress) {
+            console.log("Progress update:", progress);
+            
             // Update progress bar
             if (progress.total > 0) {
                 const percent = (progress.current / progress.total) * 100;
@@ -807,6 +840,7 @@ input:checked + .slider:before {
                 stepConvert.classList.add('completed');
                 stepEnhance.classList.add('completed');
                 stepFinalize.classList.add('active');
+                stepFinalize.classList.add('completed');
             } else if (progress.status === 'processing' || (progress.current > 0 && progress.current < progress.total)) {
                 stepUpload.classList.add('completed');
                 stepConvert.classList.add('completed');
@@ -824,8 +858,14 @@ input:checked + .slider:before {
             console.log('Setting up polling for progress updates');
             const pollInterval = 2000; // 2 seconds
             
+            // Clear any existing polling interval
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
             function poll() {
-                fetch('/progress_status?' + new Date().getTime())
+                // Add cache-busting timestamp to URL
+                fetch(`/progress_status?t=${new Date().getTime()}`)
                     .then(response => {
                         if (response.ok) {
                             return response.json();
@@ -837,28 +877,31 @@ input:checked + .slider:before {
                         
                         // Check if processing is done
                         if (progress.done || progress.status === 'completed') {
+                            console.log("Processing complete, stopping polling");
+                            if (pollingInterval) {
+                                clearInterval(pollingInterval);
+                            }
                             checkAndRedirectToResults();
                             return;
                         }
-                        
-                        // Continue polling
-                        setTimeout(poll, pollInterval);
                     })
                     .catch(error => {
                         console.error('Error fetching progress:', error);
                         // Keep polling even on error
-                        setTimeout(poll, pollInterval);
                     });
             }
             
-            // Start polling
+            // Poll immediately once
             poll();
+            
+            // Then set up interval polling
+            pollingInterval = setInterval(poll, pollInterval);
         }
         
         function checkAndRedirectToResults() {
             console.log("Processing complete, checking results");
             
-            // First try to go to task result page which will either show results or redirect
+            // Add a small delay before redirecting
             setTimeout(() => {
                 window.location.href = '/task_result';
             }, 1500);

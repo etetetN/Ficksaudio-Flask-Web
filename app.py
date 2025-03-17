@@ -144,44 +144,141 @@ def process():
 def process_audio_task(task_id, filepath, inference_steps, enable_noise, noise_offset, noise_std):
     """Process audio in a background thread"""
     try:
-        # Update task status
-        background_tasks[task_id]['status'] = 'processing'
-        background_tasks[task_id]['message'] = 'Starting audio processing'
+        # Get processor reference at the start
+        processor = get_audio_processor()
+        
+        # Update task status and ensure it's in the dictionary
+        if task_id in background_tasks:
+            background_tasks[task_id]['status'] = 'processing'
+            background_tasks[task_id]['message'] = 'Starting audio processing'
+            print(f"Beginning processing for task {task_id}")
+        
+        # Set up a function to sync processor progress to task status
+        def sync_progress():
+            if task_id in background_tasks:
+                try:
+                    progress = processor.get_progress()
+                    background_tasks[task_id].update({
+                        'message': progress.get('message', 'Processing...'),
+                        'current': progress.get('current', 0),
+                        'total': progress.get('total', 0),
+                        'done': progress.get('done', False)
+                    })
+                    # Print status for server logs
+                    if os.environ.get('PYTHONANYWHERE') == 'true':
+                        print(f"Task {task_id} progress: {progress.get('current', 0)}/{progress.get('total', 0)} - {progress.get('message', 'Processing...')}")
+                except Exception as e:
+                    print(f"Error syncing progress: {e}")
+        
+        # Set up a timer to regularly sync progress (every 2 seconds)
+        # This ensures background_tasks is updated even if no client is requesting progress
+        sync_timer = None
+        
+        def start_sync_timer():
+            def sync_and_reschedule():
+                sync_progress()
+                # Only reschedule if task is still active
+                if task_id in background_tasks and not background_tasks[task_id].get('done', False):
+                    start_sync_timer()
+            
+            nonlocal sync_timer
+            if sync_timer:
+                try:
+                    sync_timer.cancel()
+                except:
+                    pass
+            sync_timer = threading.Timer(2.0, sync_and_reschedule)
+            sync_timer.daemon = True
+            sync_timer.start()
+        
+        # Start the sync timer
+        start_sync_timer()
         
         # Process the audio file with the configured parameters
-        result = get_audio_processor().process_audio(
-            filepath, 
-            inference_steps=inference_steps,
-            enable_noise=enable_noise,
-            noise_offset=noise_offset,
-            noise_std=noise_std
-        )
+        try:
+            # Initial sync before processing starts
+            sync_progress()
+            
+            result = processor.process_audio(
+                filepath, 
+                inference_steps=inference_steps,
+                enable_noise=enable_noise,
+                noise_offset=noise_offset,
+                noise_std=noise_std
+            )
+            
+            # Final sync after processing
+            sync_progress()
+            
+            # Store result for later retrieval
+            if task_id in background_tasks:
+                background_tasks[task_id]['result'] = result
+                background_tasks[task_id]['status'] = 'completed'
+                background_tasks[task_id]['message'] = 'Processing complete'
+                background_tasks[task_id]['done'] = True
+                print(f"Task {task_id} completed successfully")
+            
+        except Exception as e:
+            # Handle processing errors
+            error_msg = f"Error processing audio: {str(e)}"
+            if task_id in background_tasks:
+                background_tasks[task_id]['status'] = 'error'
+                background_tasks[task_id]['message'] = error_msg
+                background_tasks[task_id]['error'] = str(e)
+                background_tasks[task_id]['done'] = True
+            print(f"Error in processing task {task_id}: {error_msg}")
         
-        # Store result for later retrieval
-        background_tasks[task_id]['result'] = result
-        background_tasks[task_id]['status'] = 'completed'
-        background_tasks[task_id]['message'] = 'Processing complete'
-        background_tasks[task_id]['done'] = True
+        # Cancel the timer when done
+        if sync_timer:
+            sync_timer.cancel()
         
     except Exception as e:
-        # Handle processing errors
-        error_msg = f"Error processing audio: {str(e)}"
-        background_tasks[task_id]['status'] = 'error'
-        background_tasks[task_id]['message'] = error_msg
-        background_tasks[task_id]['error'] = str(e)
-        background_tasks[task_id]['done'] = True
-        print(f"Error in processing task: {error_msg}")
+        # Handle unexpected errors
+        print(f"Unexpected error in background task {task_id}: {str(e)}")
+        if task_id in background_tasks:
+            background_tasks[task_id]['status'] = 'error'
+            background_tasks[task_id]['message'] = f"Unexpected error: {str(e)}"
+            background_tasks[task_id]['error'] = str(e)
+            background_tasks[task_id]['done'] = True
 
 @app.route('/progress')
 def progress():
     """Stream progress updates to the client using Server-Sent Events (SSE)"""
+    task_id = session.get('task_id')
+    
+    # PythonAnywhere has a 60-second timeout for requests
+    # We'll limit the SSE duration to 50 seconds to be safe
+    max_duration = 50  # seconds
+    
     def generate():
         try:
             last_data = None
+            start_time = time.time()
+            
             while True:
                 try:
-                    #Fetch current progress from the audio processor
-                    progress = get_audio_processor().get_progress()
+                    # Check if we've exceeded the max duration
+                    if time.time() - start_time > max_duration:
+                        print("SSE max duration reached, ending stream")
+                        yield f"data: {json.dumps({'message': 'Stream timeout - please reconnect for updates', 'reconnect': True, 'timestamp': int(time.time() * 1000)})}\n\n"
+                        break
+                    
+                    # Get task progress
+                    if task_id and task_id in background_tasks:
+                        progress = background_tasks[task_id].copy()
+                        
+                        # If task has no progress data, get it from processor
+                        if progress['current'] == 0 and progress['total'] == 0 and not progress.get('result'):
+                            processor_progress = get_audio_processor().get_progress()
+                            progress.update({
+                                'message': processor_progress.get('message', progress.get('message', '')),
+                                'current': processor_progress.get('current', 0),
+                                'total': processor_progress.get('total', 0),
+                                'done': processor_progress.get('done', False) or progress.get('done', False)
+                            })
+                    else:
+                        # Fall back to processor progress if no task
+                        progress = get_audio_processor().get_progress()
                     
                     #Only send data if it's changed since last update to reduce bandwidth
                     current_data = json.dumps(progress)
@@ -194,8 +291,8 @@ def progress():
                         #Force buffer flush to ensure immediate delivery to client
                         sys.stdout.flush()
                         
-                    #Exit the generator when processing completes
-                    if progress['done']:
+                    # Exit the generator when processing completes
+                    if progress.get('done', False) or progress.get('status') == 'completed':
                         yield f"data: {json.dumps({'message': 'Complete!', 'done': True, 'timestamp': int(time.time() * 1000)})}\n\n"
                         break
                         
@@ -203,13 +300,13 @@ def progress():
                     time.sleep(0.5)
                     
                 except Exception as e:
-                    #Report errors to both server log and client
+                    # Report errors to both server log and client
                     print(f"Error getting progress: {str(e)}")
                     yield f"data: {json.dumps({'message': f'Error: {str(e)}', 'error': True, 'timestamp': int(time.time() * 1000)})}\n\n"
                     time.sleep(1)
                     
         except (GeneratorExit, BrokenPipeError, ConnectionError) as e:
-            #Handle client disconnection gracefully without error
+            # Handle client disconnection gracefully without error
             print(f"Client disconnected from progress stream: {str(e)}")
             return
             
@@ -230,27 +327,44 @@ def progress_status():
     """Polling endpoint to check progress (fallback for when SSE doesn't work)"""
     task_id = session.get('task_id')
     
-    if task_id and task_id in background_tasks:
-        task_data = background_tasks[task_id].copy()
-        
-        # If there's no specific data from background task, try to get it from audio processor
-        if task_data['current'] == 0 and task_data['total'] == 0:
-            progress_data = get_audio_processor().get_progress()
-            task_data.update(progress_data)
-        
-        # Add timestamp to prevent caching
-        task_data['timestamp'] = int(time.time() * 1000)
-        return jsonify(task_data)
+    # Add timestamp to response for cache busting
+    timestamp = int(time.time() * 1000)
     
-    # Default response when no task is found
-    return jsonify({
-        'status': 'unknown',
-        'message': 'No active processing task found',
-        'current': 0,
-        'total': 0,
-        'done': False,
-        'timestamp': int(time.time() * 1000)
-    })
+    if not task_id or task_id not in background_tasks:
+        # No task ID or task not found
+        return jsonify({
+            'status': 'unknown',
+            'message': 'No active processing task found',
+            'current': 0,
+            'total': 0,
+            'done': False,
+            'timestamp': timestamp
+        })
+    
+    task_data = background_tasks[task_id].copy()
+    
+    # If there's no specific data from background task, try to get it from audio processor
+    if task_data['current'] == 0 and task_data['total'] == 0 and not task_data.get('result'):
+        try:
+            progress_data = get_audio_processor().get_progress()
+            # Don't overwrite 'status' or 'result' fields from the task
+            task_data.update({
+                'message': progress_data.get('message', task_data.get('message')),
+                'current': progress_data.get('current', 0),
+                'total': progress_data.get('total', 0),
+                'done': progress_data.get('done', False) or task_data.get('done', False)
+            })
+        except Exception as e:
+            print(f"Error getting processor progress: {e}")
+    
+    # Add timestamp to prevent caching
+    task_data['timestamp'] = timestamp
+    
+    # Additional debugging for PythonAnywhere
+    if os.environ.get('PYTHONANYWHERE') == 'true':
+        print(f"Progress update: {task_data['current']}/{task_data['total']} - {task_data['message']} (done: {task_data['done']})")
+    
+    return jsonify(task_data)
 
 @app.route('/task_result')
 def task_result():

@@ -10,7 +10,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from skimage.metrics import structural_similarity as compare_ssim
 from tensorflow.keras.layers import (
-    Input, Dense, Conv2D, Conv2DTranspose, Permute, AveragePooling2D ,MaxPooling2D, Flatten, GroupNormalization ,Cropping2D, Add, BatchNormalization, Dropout, LayerNormalization, MultiHeadAttention, Reshape, ZeroPadding2D, Concatenate, UpSampling2D, Reshape, Embedding, Lambda, RepeatVector, Layer, Conv1D
+    Input, Dense, Conv2D, Conv2DTranspose, Permute, AveragePooling2D ,MaxPooling2D, Flatten ,Cropping2D, Add, BatchNormalization, Dropout, LayerNormalization, MultiHeadAttention, Reshape, ZeroPadding2D, Concatenate, UpSampling2D, Reshape, Embedding, Lambda, RepeatVector, Layer, Conv1D
 )
 from tensorflow.keras import regularizers
 import tensorflow.keras.backend as K
@@ -51,13 +51,12 @@ try:
 except ImportError:
     print("TensorFlow not available")
 
+
 try:
-    #Try to import the diffusion model implementation
-    from diffusion.model import SpectrogramDiffusion
-    _DIFFUSION_AVAILABLE = True
-    print("Diffusion model successfully imported")
-except ImportError:
-    print("Diffusion model not available")
+    from tensorflow.keras.layers import GroupNormalization
+except Exception:
+    from tensorflow_addons.layers import GroupNormalization
+
 
 #Set mixed precision for better performance
 tf.keras.mixed_precision.set_global_policy("mixed_bfloat16")
@@ -733,6 +732,7 @@ class SHDMAudioProcessor:
     def _enhance_audio(self, audio_data: np.ndarray) -> Tuple[np.ndarray, str]:
         """
         Process audio in 10-second segments using the sample function.
+        Process multiple segments in parallel for improved performance.
         Concatenates spectrograms along the time axis and converts back to audio.
         
         Returns:
@@ -756,48 +756,69 @@ class SHDMAudioProcessor:
         original_shape = original_full_spectrogram.shape
         print(f"Original full spectrogram shape: {original_shape}")
         
-        #Process each segment
-        for i in range(total_segments):
-            #Extract segment
-            start_idx = i * segment_length
-            end_idx = min((i + 1) * segment_length, len(audio_data))
-            segment = audio_data[start_idx:end_idx]
+        #Determine batch size for parallel processing
+        #If segments <= 3, process all at once, otherwise use 3 at a time
+        batch_size = min(3, total_segments)
+        
+        #Process segments in batches
+        for batch_idx in range(0, total_segments, batch_size):
+            batch_spectrograms = []
+            batch_end = min(batch_idx + batch_size, total_segments)
+            batch_segments = range(batch_idx, batch_end)
             
-            #Pad last segment if needed
-            if len(segment) < segment_length:
-                padding = np.zeros(segment_length - len(segment))
-                segment = np.concatenate([segment, padding])
+            # Update progress
+            self._update_progress(message=f"Processing segments {batch_idx+1}-{batch_end} of {total_segments}", 
+                                 current=batch_idx+1)
             
-            #Convert to spectrogram
-            spec = self.convert_audio_to_spectrogram(segment)
+            # Process each segment in this batch
+            for i in batch_segments:
+                #Extract segment
+                start_idx = i * segment_length
+                end_idx = min((i + 1) * segment_length, len(audio_data))
+                segment = audio_data[start_idx:end_idx]
+                
+                #Pad last segment if needed
+                if len(segment) < segment_length:
+                    padding = np.zeros(segment_length - len(segment))
+                    segment = np.concatenate([segment, padding])
+                
+                #Convert to spectrogram
+                spec = self.convert_audio_to_spectrogram(segment)
 
-            #Add batch dimension for model input
-            spec = np.expand_dims(spec, axis=0)
+                #Add batch dimension for model input
+                spec = np.expand_dims(spec, axis=0)
 
-            print(f"Input spectrogram shape: {spec.shape}")
+                print(f"Input spectrogram shape: {spec.shape}")
 
-            #Convert to tensor
-            spec = tf.convert_to_tensor(spec, dtype=tf.float32)
+                #Convert to tensor
+                spec = tf.convert_to_tensor(spec, dtype=tf.float32)
+                
+                #Sample the spectrogram
+                enhanced_spec = self.sample(
+                    x_input=spec,
+                    num_inference_steps=self.inference_steps
+                )
+                
+                #Convert from tensor to numpy
+                if isinstance(enhanced_spec, tf.Tensor):
+                    enhanced_spec = enhanced_spec.numpy()
+                
+                print(f"Enhanced spectrogram shape: {enhanced_spec.shape}")
+                
+                #Store prediction
+                batch_spectrograms.append(enhanced_spec)
+                
+                # Update progress for this specific segment
+                self._update_progress(
+                    message=f"Processed segment {i+1} of {total_segments}",
+                    current=i+1
+                )
             
-            #Update progress message
-            self._update_progress(message=f"Processing segment {i+1} of {total_segments}", current=i+1)
+            # Add completed batch spectrograms to main list
+            all_spectrograms.extend(batch_spectrograms)
             
-            #Sample the spectrogram
-            enhanced_spec = self.sample(
-                x_input=spec,
-                num_inference_steps=self.inference_steps
-            )
-            
-            #Convert from tensor to numpy
-            if isinstance(enhanced_spec, tf.Tensor):
-                enhanced_spec = enhanced_spec.numpy()
-            
-            print(f"Enhanced spectrogram shape: {enhanced_spec.shape}")
-            
-            #Store prediction (keep the batch dimension for now)
-            all_spectrograms.append(enhanced_spec)
-            
-            #Force garbage collection after each segment
+            # Clean up TensorFlow memory between batches
+            tf.keras.backend.clear_session()
             gc.collect()
         
         #Concatenate all spectrograms along the time axis (axis=2)
@@ -845,6 +866,9 @@ class SHDMAudioProcessor:
             print(f"Failed to convert spectrogram to audio or file not found at {temp_path}")
             #Return original audio as fallback
             return audio_data, ""
+        
+        # Mark processing as complete
+        self._update_progress(message="Processing complete!", done=True)
         
         #Load the converted audio but DO NOT delete the temp file
         try:
