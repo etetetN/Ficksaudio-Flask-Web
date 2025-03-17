@@ -162,6 +162,236 @@ input:checked + .slider:before {
 .info-icon:hover {
     color: #2980b9;
 }
+
+.processing-content {
+    position: relative;
+    background: rgba(30, 30, 62, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 24px;
+    border: 1px solid rgba(106, 90, 205, 0.2);
+    padding: 2.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.processing-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(255, 87, 151, 0.05) 0%, 
+        rgba(106, 90, 205, 0.05) 50%,
+        rgba(0, 229, 255, 0.05) 100%);
+    z-index: -1;
+}
+
+.processing-spinner {
+    font-size: 3.5rem;
+    color: #ff5797;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 15px rgba(255, 87, 151, 0.6);
+    animation: spin 2s infinite linear, colorChange 4s infinite alternate;
+}
+
+@keyframes colorChange {
+    0% { color: #ff5797; text-shadow: 0 0 15px rgba(255, 87, 151, 0.6); }
+    50% { color: #6a5acd; text-shadow: 0 0 15px rgba(106, 90, 205, 0.6); }
+    100% { color: #00e5ff; text-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
+}
+
+.processing-content h3 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(45deg, #ff5797, #6a5acd, #00e5ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 700;
+}
+
+.progress-message {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    min-height: 1.8rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.progress-count {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1.5rem;
+    min-height: 1.2rem;
+}
+
+.progress-bar {
+    height: 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff5797, #6a5acd, #00e5ff);
+    background-size: 200% 100%;
+    animation: gradient-shift 2s linear infinite;
+    border-radius: 20px;
+    transition: width 0.3s ease;
+    position: relative;
+    width: 0%;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 255, 255, 0.3) 50%, 
+        rgba(255, 255, 255, 0) 100%);
+    animation: shine 1.5s infinite;
+}
+
+@keyframes shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* Processing Steps */
+.processing-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    opacity: 1;
+    transform: translateY(-5px);
+}
+
+.step.completed {
+    opacity: 1;
+}
+
+.step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 25px;
+    right: -50%;
+    width: 100%;
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.2);
+    z-index: 0;
+}
+
+.step.completed:not(:last-child)::after {
+    background: linear-gradient(90deg, #ff5797, #6a5acd);
+}
+
+.step-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: rgba(30, 30, 62, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    font-size: 1.2rem;
+    color: #ffffff;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s ease;
+}
+
+.step.active .step-icon {
+    background: linear-gradient(135deg, #ff5797, #6a5acd);
+    border-color: #ffffff;
+    box-shadow: 0 0 15px rgba(106, 90, 205, 0.5);
+    animation: pulse 2s infinite;
+}
+
+.step.completed .step-icon {
+    background: linear-gradient(135deg, #6a5acd, #00e5ff);
+    border-color: #ffffff;
+}
+
+.step-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+}
+
+.step.active .step-label {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Fun facts */
+.fun-fact-container {
+    margin-top: 2rem;
+    min-height: 80px;
+}
+
+.fun-fact {
+    background-color: rgba(0, 229, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    align-items: flex-start;
+    animation: fadeIn 0.5s ease;
+}
+
+.fun-fact i {
+    color: #00e5ff;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+    margin-top: 0.2rem;
+}
+
+.fun-fact p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
 </style>
 
 <section class="process-section">
@@ -261,24 +491,98 @@ input:checked + .slider:before {
                 <i class="fas fa-cog fa-spin"></i>
             </div>
             <h3>Processing Your Audio</h3>
-            <p id="progress-message">Preparing to process...</p>
+            <div id="progress-message" class="progress-message">Initializing...</div>
+            <div id="progress-count" class="progress-count">Preparing to process...</div>
             <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
+                <div id="progress-fill" class="progress-fill"></div>
             </div>
-            <div class="progress-details">
-                <span id="progress-count"></span>
+            <div class="processing-steps">
+                <div class="step" id="step-upload">
+                    <div class="step-icon"><i class="fas fa-upload"></i></div>
+                    <div class="step-label">File Uploaded</div>
+                </div>
+                <div class="step" id="step-convert">
+                    <div class="step-icon"><i class="fas fa-wave-square"></i></div>
+                    <div class="step-label">Converting Audio</div>
+                </div>
+                <div class="step" id="step-enhance">
+                    <div class="step-icon"><i class="fas fa-magic"></i></div>
+                    <div class="step-label">Enhancing Audio</div>
+                </div>
+                <div class="step" id="step-finalize">
+                    <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="step-label">Finalizing Result</div>
+                </div>
+            </div>
+            <div class="fun-fact-container">
+                <div id="fun-fact" class="fun-fact">
+                    <i class="fas fa-lightbulb"></i>
+                    <p>Did you know? Our AI model processes audio in frequency-time space instead of raw waveforms.</p>
+                </div>
             </div>
         </div>
     </div>
     
     <div class="experimental-notice">
         <i class="fas fa-flask"></i>
-        <p>This is an experimental AI model, Results may vary!</p>
+        <p>This is an experimental AI model. Results may vary depending on input quality.</p>
     </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
+<!-- Set processing mode flag -->
+{% if processing %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize processing overlay
+        const processingOverlay = document.getElementById('processing-overlay');
+        if (processingOverlay) {
+            processingOverlay.classList.add('active');
+        }
+        
+        // Start progress monitoring
+        if (typeof startProgressMonitoring === 'function') {
+            startProgressMonitoring();
+        }
+        
+        // Mark upload step as completed
+        const stepUpload = document.getElementById('step-upload');
+        if (stepUpload) {
+            stepUpload.classList.add('completed');
+        }
+        
+        // Start fun facts
+        const funFacts = [
+            "Our AI model processes audio in frequency-time space (spectrograms) instead of raw waveforms.",
+            "The model was trained on thousands of hours of audio data to learn how to distinguish noise from signal.",
+            "Audio enhancement uses a special algorithm known as a 'diffusion model', which gradually removes noise.",
+            "Each audio segment is processed through dozens of neural network steps to achieve the best quality.",
+            "The spectrogram visualization shows you the frequency content of your audio over time.",
+            "Lower frequencies (bass sounds) appear at the bottom of spectrograms, while higher frequencies are at the top.",
+            "Our model can help reduce background noise, hiss, and improve overall clarity.",
+            "Bright spots in the enhanced spectrogram indicate stronger audio signals.",
+            "The neural network has over 30 million parameters that work together to enhance your audio.",
+            "Audio processing utilizes your computer's CPU and memory resources to run complex calculations."
+        ];
+        
+        // Show random fun facts every 8 seconds
+        const factElement = document.getElementById('fun-fact');
+        if (factElement) {
+            window.factInterval = setInterval(() => {
+                const randomFact = funFacts[Math.floor(Math.random() * funFacts.length)];
+                factElement.style.opacity = 0;
+                
+                setTimeout(() => {
+                    factElement.innerHTML = `<i class="fas fa-lightbulb"></i><p>${randomFact}</p>`;
+                    factElement.style.opacity = 1;
+                }, 500);
+            }, 8000);
+        }
+    });
+</script>
+{% endif %}
+
 <script>
     //File upload handling
     const dropArea = document.getElementById('drop-area');
@@ -432,9 +736,29 @@ input:checked + .slider:before {
                     progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
                 }
                 
+                // Update steps based on progress message
+                if (progress.current > 0 && progress.current < progress.total) {
+                    document.getElementById('step-upload').classList.add('completed');
+                    document.getElementById('step-convert').classList.add('completed');
+                    document.getElementById('step-enhance').classList.add('active');
+                } else if (progress.message && progress.message.includes('Converting')) {
+                    document.getElementById('step-upload').classList.add('completed');
+                    document.getElementById('step-convert').classList.add('active');
+                } else if (progress.done) {
+                    document.getElementById('step-upload').classList.add('completed');
+                    document.getElementById('step-convert').classList.add('completed');
+                    document.getElementById('step-enhance').classList.add('completed');
+                    document.getElementById('step-finalize').classList.add('active');
+                }
+                
                 //Close connection when done
                 if (progress.done) {
                     eventSource.close();
+                    
+                    // Redirect to results page after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/results';
+                    }, 1500);
                 }
                 
                 //Force DOM update
@@ -454,7 +778,74 @@ input:checked + .slider:before {
         eventSource.onerror = function(e) {
             console.error('EventSource failed:', e);
             eventSource.close();
+            
+            // Set up polling as fallback
+            setupPolling();
         };
+    }
+    
+    function setupPolling() {
+        console.log('Setting up polling fallback');
+        const pollInterval = 3000; // 3 seconds
+        const progressMessage = document.getElementById('progress-message');
+        const progressCount = document.getElementById('progress-count');
+        const progressFill = document.getElementById('progress-fill');
+        
+        const checkProgress = async () => {
+            try {
+                const response = await fetch('/progress_status');
+                if (response.ok) {
+                    const progress = await response.json();
+                    
+                    //Update progress bar
+                    if (progress.total > 0) {
+                        const percent = (progress.current / progress.total) * 100;
+                        progressFill.style.width = `${percent}%`;
+                    }
+                    
+                    //Update message
+                    if (progress.message) {
+                        progressMessage.textContent = progress.message;
+                    }
+                    
+                    //Update count
+                    if (progress.current !== undefined && progress.total !== undefined) {
+                        progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
+                    }
+                    
+                    // Update steps based on progress message
+                    if (progress.current > 0 && progress.current < progress.total) {
+                        document.getElementById('step-upload').classList.add('completed');
+                        document.getElementById('step-convert').classList.add('completed');
+                        document.getElementById('step-enhance').classList.add('active');
+                    } else if (progress.message && progress.message.includes('Converting')) {
+                        document.getElementById('step-upload').classList.add('completed');
+                        document.getElementById('step-convert').classList.add('active');
+                    } else if (progress.done) {
+                        document.getElementById('step-upload').classList.add('completed');
+                        document.getElementById('step-convert').classList.add('completed');
+                        document.getElementById('step-enhance').classList.add('completed');
+                        document.getElementById('step-finalize').classList.add('active');
+                        
+                        // Redirect to results page after a short delay
+                        setTimeout(() => {
+                            window.location.href = '/results';
+                        }, 1500);
+                        
+                        clearInterval(pollingId);
+                    }
+                    
+                } else {
+                    console.error('Error fetching progress status:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error in polling:', error);
+            }
+        };
+        
+        // Start polling
+        const pollingId = setInterval(checkProgress, pollInterval);
+        checkProgress(); // Call immediately for first update
     }
     
     //Update form submit handler
@@ -480,18 +871,13 @@ input:checked + .slider:before {
     audioPlayer.addEventListener('ended', stopVisualizer);
     
     const stepsSlider = document.getElementById('inference-steps');
-    const stepsValue = document.getElementById('steps-value');
-    
-    stepsSlider.addEventListener('input', (e) => {
-        stepsValue.textContent = e.target.value;
-    });
+    const stepsDisplay = document.getElementById('steps-display');
     
     // Add new script for handling noise controls
     const enableNoise = document.getElementById('enable-noise');
     const noiseControls = document.getElementById('noise-controls');
     const noiseOffset = document.getElementById('noise-offset');
     const noiseStd = document.getElementById('noise-std');
-    const stepsDisplay = document.getElementById('steps-display');
     const offsetDisplay = document.getElementById('offset-display');
     const stdDisplay = document.getElementById('std-display');
     

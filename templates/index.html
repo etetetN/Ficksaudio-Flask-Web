@@ -57,7 +57,7 @@
 
 <section class="tech-info">
     <h2>For AI Enthusiasts</h2>
-    <p>FIcksAudio uses the technology of diffusion model to 'fix' bad elements of a given audio file. THowever, keep in mind this isn't anywhere near perfect!</p>
+    <p>FIcksAudio uses diffusion model technology to enhance and fix problematic elements in your audio files. Please note that results may vary depending on the input quality.</p>
     
     <div class="tech-details">
         <div class="tech-item">
@@ -71,7 +71,7 @@
         </div>
         <div class="tech-item">
             <h3>File Limits</h3>
-            <p>Maximum 16MB file size, You really don't need more than that for inputting a bad audio</p>
+            <p>Maximum 16MB file size. Larger files can be split into segments for better processing.</p>
         </div>
     </div>
 </section>
@@ -79,7 +79,7 @@
 
 {% block scripts %}
 <script>
-    //Animated waveform
+    //Animated waveform visualization
     const waveBars = document.querySelectorAll('.wave-bar');
     
     function animateWave() {
@@ -89,12 +89,10 @@
         });
     }
     
-    //Initial animation
+    //Initialize waveform animation
     animateWave();
     
-    //Continue animation
+    //Continue animation at regular intervals
     setInterval(animateWave, 300);
-    
-    //Logo hover animation is handled in CSS
 </script>
 {% endblock %} 

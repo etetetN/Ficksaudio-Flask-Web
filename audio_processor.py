@@ -20,8 +20,39 @@ import random
 import math
 import requests
 import tempfile
+from flask import current_app, session
+import time
+import shutil
+import uuid
 
+#Track availability of optional dependencies
+_TF_AVAILABLE = False
+_DIFFUSION_AVAILABLE = False
+
+#Initialize global progress tracking dictionary
+_progress = {'message': 'Initializing...', 'current': 0, 'total': 0, 'done': False}
+
+try:
+    #Attempt to import TensorFlow and enable optimizations
+    import tensorflow as tf
+    _TF_AVAILABLE = True
+    #Enable mixed precision to improve performance on compatible hardware
+    tf.keras.mixed_precision.set_global_policy('mixed_float16')
+    print("TensorFlow successfully imported with mixed precision enabled")
+except ImportError:
+    print("TensorFlow not available")
+
+try:
+    #Try to import the diffusion model implementation
+    from diffusion.model import SpectrogramDiffusion
+    _DIFFUSION_AVAILABLE = True
+    print("Diffusion model successfully imported")
+except ImportError:
+    print("Diffusion model not available")
+
+#Set mixed precision for better performance
 tf.keras.mixed_precision.set_global_policy("mixed_bfloat16")
+#Enable eager execution for simplified debugging and development
 tf.config.run_functions_eagerly(True)
 
 def cross_attention_block_with_groupnorm(input_layer, cross_layer, num_heads, embedding_dim, num_groups=32):
@@ -173,14 +204,12 @@ class SHDMAudioProcessor:
         """
         Initialize the audio processor with an optional model path.
         """
+        #Don't load TensorFlow dependencies until needed
+        self.model = None
+        self.tf_loaded = False
 
         #Initialize progress tracking
-        self.progress = {
-            'current': 0,
-            'total': 0,
-            'message': '',
-            'done': False
-        }
+        self._reset_progress()
 
         self.timesteps = 1000
         self.beta_start = 0.0
@@ -191,25 +220,19 @@ class SHDMAudioProcessor:
         #Check if running on PythonAnywhere
         self.is_pythonanywhere = os.environ.get('PYTHONANYWHERE', 'false') == 'true'
         
-        #Set up model paths based on environment
+        #Set up model paths
+        home_dir = os.path.expanduser('~')
         if self.is_pythonanywhere:
-            home_dir = os.path.expanduser('~')
-            self.model_dir = os.path.join(home_dir, 'model_files')
-            self.model_weights_path = os.path.join(self.model_dir, 'best_model.weights.h5')
+            self.model_dir = os.path.join(home_dir, 'Ficksaudio-Flask-Web', 'model_files')
+            self.model_weights_path = os.path.join(self.model_dir, 'model_export')
             self.model_coord_mult_path = os.path.join(self.model_dir, 'coord_mult.npy')
             self.model_fourier_features_path = os.path.join(self.model_dir, 'fourier_features.npy')
-        elif os.environ.get('VERCEL_ENV') == 'production':
-            #Vercel Blob URLs
-            self.model_weights_url = os.environ.get('MODEL_WEIGHTS_URL', '')
-            self.model_coord_mult_url = os.environ.get('MODEL_COORD_MULT_URL', '')
-            self.model_fourier_features_url = os.environ.get('MODEL_FOURIER_FEATURES_URL', '')
         else:
             #Local development - use paths from .env file or default to models_data directory
             self.model_weights_path = os.environ.get('MODEL_WEIGHTS_PATH', 'models_data/best_model.weights.h5')
             self.model_coord_mult_path = os.environ.get('MODEL_COORD_MULT_PATH', 'models_data/coord_mult.npy')
             self.model_fourier_features_path = os.environ.get('MODEL_FOURIER_FEATURES_PATH', 'models_data/fourier_features.npy')
         
-        self.model = None
         self.sample_rate = 44100
 
         self.fourier_feature_timestep_freqs = tf.Variable(
@@ -231,16 +254,75 @@ class SHDMAudioProcessor:
                                       name="image_coord_multiplier"
                                       )
 
-        #Create cache directories for the temporary data such as waveforms and spectrograms..
+        #Create cache directories for the temporary data such as waveforms and spectrograms
         if self.is_pythonanywhere:
-            self.cache_dir = os.path.join(os.path.expanduser('~'), 'ficksaudio_cache')
+            self.cache_dir = os.path.join('/tmp', 'ficksaudio_cache')
         else:
-            self.cache_dir = '/tmp/cache' if os.environ.get('VERCEL_ENV') == 'production' else os.path.join('static', 'cache')
+            self.cache_dir = os.path.join('static', 'cache')
         
         os.makedirs(self.cache_dir, exist_ok=True)
         
         #Load the model
         self._load_model()
+    
+    def _reset_progress(self):
+        """Reset progress tracking"""
+        global _progress
+        _progress = {
+            'message': 'Ready to process',
+            'current': 0,
+            'total': 0,
+            'percent': 0,
+            'done': False
+        }
+        # Store in session if available
+        try:
+            if 'progress_data' not in session:
+                session['progress_data'] = {}
+            session['progress_data']['status'] = _progress
+        except RuntimeError:
+            # Not in application context
+            pass
+            
+    def _update_progress(self, message=None, current=None, total=None, percent=None, done=False):
+        """Update progress tracking and store in session"""
+        global _progress
+        
+        if message is not None:
+            _progress['message'] = message
+        
+        if current is not None:
+            _progress['current'] = current
+            
+        if total is not None:
+            _progress['total'] = total
+            
+        if percent is not None:
+            _progress['percent'] = percent
+            
+        if current is not None and total is not None and total > 0:
+            _progress['percent'] = current / total
+            
+        if done:
+            _progress['done'] = True
+            _progress['percent'] = 1.0
+            _progress['message'] = 'Processing complete!'
+            
+        # Store in session if available
+        try:
+            if 'progress_data' not in session:
+                session['progress_data'] = {}
+            session['progress_data']['status'] = _progress.copy()
+            # Explicitly mark session as modified for PythonAnywhere compatibility
+            session.modified = True
+        except RuntimeError:
+            # Not in application context
+            pass
+            
+    def get_progress(self):
+        """Return current progress information"""
+        global _progress
+        return _progress.copy()
     
     def _download_file(self, url: str, local_path: str) -> bool:
         """Download a file from a URL to a local path."""
@@ -256,93 +338,63 @@ class SHDMAudioProcessor:
             return False
     
     def _load_model(self):
-        """
-        Load the model based on environment (PythonAnywhere, Vercel, or local)
-        """
-        try:
-            if self.is_pythonanywhere:
-                #Direct file loading on PythonAnywhere
-                self.model = create_unet()
-                if os.path.exists(self.model_weights_path):
-                    self.model.load_weights(self.model_weights_path)
-                else:
-                    print(f"Error loading model: model weights path does not exist at {self.model_weights_path}!")
-                    self.model = None
-
-                if os.path.exists(self.model_fourier_features_path):
-                    self.fourier_feature_timestep_freqs.assign(
-                        tf.convert_to_tensor(np.load(self.model_fourier_features_path), dtype=tf.float32)
-                    )
-                else:
-                    print(f"Error loading model: fourier features path does not exist at {self.model_fourier_features_path}!")
-                    self.model = None
-
-                if os.path.exists(self.model_coord_mult_path):
-                    self.coord_mult.assign(
-                        tf.convert_to_tensor(np.load(self.model_coord_mult_path), dtype=tf.float32)
-                    )
-                else:
-                    print(f"Error loading model: coord mult path does not exist at {self.model_coord_mult_path}!")
-                    self.model = None
-            elif os.environ.get('VERCEL_ENV') == 'production':
-                #Vercel Blob URL loading
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    #Download model files
-                    weights_path = os.path.join(temp_dir, 'best_model.weights.h5')
-                    coord_mult_path = os.path.join(temp_dir, 'coord_mult.npy')
-                    fourier_features_path = os.path.join(temp_dir, 'fourier_features.npy')
-
-                    #Download files from Vercel Blobs
-                    if not all([
-                        self._download_file(self.model_weights_url, weights_path),
-                        self._download_file(self.model_coord_mult_url, coord_mult_path),
-                        self._download_file(self.model_fourier_features_url, fourier_features_path)
-                    ]):
-                        print("Error downloading model files from Vercel Blobs")
-                        self.model = None
-                        return
-
-                    #Load the model and weights
-                    self.model = create_unet()
-                    self.model.load_weights(weights_path)
-
-                    #Load the fourier features
-                    self.fourier_feature_timestep_freqs.assign(
-                        tf.convert_to_tensor(np.load(fourier_features_path), dtype=tf.float32)
-                    )
-
-                    #Load the coordinate multiplier
-                    self.coord_mult.assign(
-                        tf.convert_to_tensor(np.load(coord_mult_path), dtype=tf.float32)
-                    )
-            else:
-                # Local development - load directly from file paths
-                self.model = create_unet()
-                if os.path.exists(self.model_weights_path):
-                    self.model.load_weights(self.model_weights_path)
-                else:
-                    print(f"Error loading model: model weights path does not exist at {self.model_weights_path}!")
-                    self.model = None
-
-                if os.path.exists(self.model_fourier_features_path):
-                    self.fourier_feature_timestep_freqs.assign(
-                        tf.convert_to_tensor(np.load(self.model_fourier_features_path), dtype=tf.float32)
-                    )
-                else:
-                    print(f"Error loading model: fourier features path does not exist at {self.model_fourier_features_path}!")
-                    self.model = None
-
-                if os.path.exists(self.model_coord_mult_path):
-                    self.coord_mult.assign(
-                        tf.convert_to_tensor(np.load(self.model_coord_mult_path), dtype=tf.float32)
-                    )
-                else:
-                    print(f"Error loading model: coord mult path does not exist at {self.model_coord_mult_path}!")
-                    self.model = None
+        """Load the model and its weights."""
+        if not self.tf_loaded:
+            # Lazy load TensorFlow dependencies
+            global tf
+            import tensorflow as tf
+            from tensorflow.keras.models import Model
+            tf.keras.mixed_precision.set_global_policy("mixed_bfloat16")
+            tf.config.run_functions_eagerly(True)
+            self.tf_loaded = True
             
+        try:
+            print(f"Loading model from {self.model_weights_path}")
+            
+            if self.is_pythonanywhere:
+                # For PythonAnywhere: use tf.saved_model.load
+                if os.path.exists(self.model_weights_path):
+                    print("Loading saved model from directory...")
+                    self.model = tf.saved_model.load(self.model_weights_path)
+                    print("Model loaded successfully!")
+                else:
+                    raise FileNotFoundError(f"Model directory not found at {self.model_weights_path}")
+            else:
+                # For local development: use create_unet and load_weights
+                self.model = create_unet()
+                
+                if os.path.isdir(self.model_weights_path):
+                    # If it's a directory, load as SavedModel
+                    print("Loading as SavedModel...")
+                    saved_model = tf.keras.models.load_model(self.model_weights_path)
+                    # Copy weights from saved model to our model
+                    self.model.set_weights(saved_model.get_weights())
+                elif os.path.exists(self.model_weights_path):
+                    # If it's a file, load as weights file
+                    self.model.load_weights(self.model_weights_path)
+                else:
+                    raise FileNotFoundError(f"Model weights not found at {self.model_weights_path}")
+            
+            # Load auxiliary model data
+            if os.path.exists(self.model_coord_mult_path):
+                print(f"Loading coord_mult from {self.model_coord_mult_path}")
+                self.coord_mult.assign(np.load(self.model_coord_mult_path))
+            else:
+                print(f"Warning: coord_mult file not found at {self.model_coord_mult_path}")
+                
+            if os.path.exists(self.model_fourier_features_path):
+                print(f"Loading fourier_features from {self.model_fourier_features_path}")
+                self.fourier_feature_timestep_freqs.assign(np.load(self.model_fourier_features_path))
+            else:
+                print(f"Warning: fourier_features file not found at {self.model_fourier_features_path}")
+                
+            print("Model loading complete!")
+                
         except Exception as e:
-            print(f"Error loading model: {e}")
-            self.model = None
+            print(f"Error loading model: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def create_time_channels(self, x, t):
         """Create time channels for each pixel"""
@@ -510,7 +562,8 @@ class SHDMAudioProcessor:
 
     def get_progress(self):
         """Return current progress information"""
-        return self.progress
+        global _progress
+        return _progress.copy()
     
     def _generate_waveform(self, audio_data: np.ndarray) -> Dict[str, Any]:
         """
@@ -675,22 +728,22 @@ class SHDMAudioProcessor:
             Tuple of (enhanced_audio_data, temp_file_path)
         """
         #Initialize progress tracking
-        self.progress = {
-            'current': 0,
-            'total': 0,
-            'message': '',
-            'done': False
-        }
+        self._update_progress(message="Loading model...")
 
         #Calculate segment parameters
         segment_length = 10 * self.sample_rate  #10 seconds of audio
         
         #Calculate number of segments
         total_segments = math.ceil(len(audio_data) / segment_length)
-        self.progress['total'] = total_segments
+        self._update_progress(message=f"Processing {total_segments} segments...", total=total_segments)
         
         #Initialize array for enhanced spectrograms
         all_spectrograms = []
+        
+        #First, get the original full spectrogram to determine final dimensions
+        original_full_spectrogram = self.convert_audio_to_spectrogram(audio_data)
+        original_shape = original_full_spectrogram.shape
+        print(f"Original full spectrogram shape: {original_shape}")
         
         #Process each segment
         for i in range(total_segments):
@@ -716,8 +769,7 @@ class SHDMAudioProcessor:
             spec = tf.convert_to_tensor(spec, dtype=tf.float32)
             
             #Update progress message
-            self.progress['current'] = i + 1
-            self.progress['message'] = f'Processing segment {i+1} of {total_segments}'
+            self._update_progress(message=f"Processing segment {i+1} of {total_segments}", current=i+1)
             
             #Sample the spectrogram
             enhanced_spec = self.sample(
@@ -757,8 +809,18 @@ class SHDMAudioProcessor:
         final_spectrogram = np.squeeze(final_spectrogram)
         print(f"Final spectrogram shape after squeeze: {final_spectrogram.shape}")
         
+        #Trim or pad the final spectrogram to match the original spectrogram's time dimension
+        if final_spectrogram.shape[1] > original_shape[1]:
+            print(f"Trimming final spectrogram from {final_spectrogram.shape} to match original width {original_shape[1]}")
+            final_spectrogram = final_spectrogram[:, :original_shape[1]]
+        elif final_spectrogram.shape[1] < original_shape[1]:
+            print(f"Padding final spectrogram from {final_spectrogram.shape} to match original width {original_shape[1]}")
+            pad_width = original_shape[1] - final_spectrogram.shape[1]
+            final_spectrogram = np.pad(final_spectrogram, ((0, 0), (0, pad_width)), mode='constant')
+            print(f"Padded spectrogram shape: {final_spectrogram.shape}")
+        
         #Update progress for conversion back to audio
-        self.progress['message'] = 'Converting enhanced spectrogram to audio...'
+        self._update_progress(message="Converting enhanced spectrogram to audio...")
         
         #Convert concatenated spectrogram back to audio
         temp_path = os.path.join(self.cache_dir, 'temp_enhanced.wav')
@@ -776,14 +838,9 @@ class SHDMAudioProcessor:
         #Load the converted audio but DO NOT delete the temp file
         try:
             enhanced_audio, _ = librosa.load(temp_path, sr=self.sample_rate)
-            
-            #Mark processing as complete
-            self.progress['done'] = True
-            
             return enhanced_audio, temp_path
         except Exception as e:
-            print(f"Error loading enhanced audio: {str(e)}")
-            #Return original audio as fallback
+            print(f"Error loading enhanced audio: {e}")
             return audio_data, ""
     
     def _save_enhanced_audio(self, enhanced_audio: np.ndarray, original_path: str, temp_path: str = "") -> str:
@@ -801,9 +858,9 @@ class SHDMAudioProcessor:
         try:
             #Determine output directory based on environment
             if self.is_pythonanywhere:
-                output_dir = os.path.join(os.path.expanduser('~'), 'ficksaudio_enhanced')
+                output_dir = os.path.join('/tmp', 'ficksaudio_enhanced')
             else:
-                output_dir = '/tmp/enhanced' if os.environ.get('VERCEL_ENV') == 'production' else os.path.join('static', 'cache', 'enhanced')
+                output_dir = os.path.join('static', 'cache', 'enhanced')
             
             #Create output directory if it doesn't exist
             os.makedirs(output_dir, exist_ok=True)
@@ -822,7 +879,7 @@ class SHDMAudioProcessor:
                 import shutil
                 shutil.copy2(temp_path, enhanced_path)
                 
-                #lean up the temp file after copying
+                #Clean up the temp file after copying
                 try:
                     os.remove(temp_path)
                     print(f"Temp file removed: {temp_path}")
