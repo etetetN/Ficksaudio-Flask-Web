@@ -24,13 +24,22 @@ from flask import current_app, session
 import time
 import shutil
 import uuid
+import threading
 
 #Track availability of optional dependencies
 _TF_AVAILABLE = False
 _DIFFUSION_AVAILABLE = False
 
 #Initialize global progress tracking dictionary
-_progress = {'message': 'Initializing...', 'current': 0, 'total': 0, 'done': False}
+_progress = {
+    'message': '',
+    'current': 0,
+    'total': 0,
+    'done': False
+}
+
+#Use a threading lock to prevent race conditions when updating progress
+_progress_lock = threading.RLock()
 
 try:
     #Attempt to import TensorFlow and enable optimizations
@@ -268,61 +277,62 @@ class SHDMAudioProcessor:
     def _reset_progress(self):
         """Reset progress tracking"""
         global _progress
-        _progress = {
-            'message': 'Ready to process',
-            'current': 0,
-            'total': 0,
-            'percent': 0,
-            'done': False
-        }
-        # Store in session if available
+        with _progress_lock:
+            _progress = {
+                'message': 'Initializing...',
+                'current': 0,
+                'total': 0,
+                'done': False
+            }
+        
         try:
-            if 'progress_data' not in session:
-                session['progress_data'] = {}
-            session['progress_data']['status'] = _progress
-        except RuntimeError:
-            # Not in application context
+            # Attempt to store in Flask session if available
+            if session is not None:
+                session['progress_data'] = {'status': _progress}
+                session.modified = True
+        except (RuntimeError, ImportError):
+            # Either we're outside a request context or Flask isn't available
             pass
             
-    def _update_progress(self, message=None, current=None, total=None, percent=None, done=False):
-        """Update progress tracking and store in session"""
+    def _update_progress(self, message=None, current=None, total=None, done=False):
+        """Update global progress information
+        
+        Args:
+            message: Status message to display
+            current: Current progress step
+            total: Total number of steps
+            done: Whether processing is complete
+        """
         global _progress
+        with _progress_lock:
+            if message is not None:
+                _progress['message'] = message
+            if current is not None:
+                _progress['current'] = current
+            if total is not None:
+                _progress['total'] = total
+            
+            # Only set done=True, never back to False
+            if done:
+                _progress['done'] = True
+            
+        # Log progress update for debugging
+        print(f"Progress update: {current}/{total} - {message} (done: {done})")
         
-        if message is not None:
-            _progress['message'] = message
-        
-        if current is not None:
-            _progress['current'] = current
-            
-        if total is not None:
-            _progress['total'] = total
-            
-        if percent is not None:
-            _progress['percent'] = percent
-            
-        if current is not None and total is not None and total > 0:
-            _progress['percent'] = current / total
-            
-        if done:
-            _progress['done'] = True
-            _progress['percent'] = 1.0
-            _progress['message'] = 'Processing complete!'
-            
-        # Store in session if available
         try:
-            if 'progress_data' not in session:
-                session['progress_data'] = {}
-            session['progress_data']['status'] = _progress.copy()
-            # Explicitly mark session as modified for PythonAnywhere compatibility
-            session.modified = True
-        except RuntimeError:
-            # Not in application context
+            # Attempt to store in Flask session if available
+            if session is not None:
+                session['progress_data'] = {'status': _progress}
+                session.modified = True
+        except (RuntimeError, ImportError):
+            # Either we're outside a request context or Flask isn't available
             pass
             
     def get_progress(self):
         """Return current progress information"""
         global _progress
-        return _progress.copy()
+        with _progress_lock:
+            return _progress.copy()
     
     def _download_file(self, url: str, local_path: str) -> bool:
         """Download a file from a URL to a local path."""
@@ -563,7 +573,8 @@ class SHDMAudioProcessor:
     def get_progress(self):
         """Return current progress information"""
         global _progress
-        return _progress.copy()
+        with _progress_lock:
+            return _progress.copy()
     
     def _generate_waveform(self, audio_data: np.ndarray) -> Dict[str, Any]:
         """

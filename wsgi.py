@@ -9,5 +9,5 @@ if project_home not in sys.path:
 #Set PythonAnywhere environment variable
 os.environ['PYTHONANYWHERE'] = 'true'
 
-#Import your Flask app
+#Import the Flask app
 from app import app as application 

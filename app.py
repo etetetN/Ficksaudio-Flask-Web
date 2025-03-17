@@ -52,6 +52,9 @@ app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 16 *
 #Initialize audio processor at startup and store as a global variable
 audio_processor = SHDMAudioProcessor()
 
+#Store background tasks with their status
+background_tasks = {}
+
 def get_audio_processor():
     """Return the global audio processor instance"""
     global audio_processor
@@ -98,38 +101,38 @@ def process():
         if file and allowed_file(file.filename):
             #Secure the filename to prevent directory traversal attacks
             filename = secure_filename(file.filename)
+            
+            #Generate a unique task ID
+            task_id = str(uuid.uuid4())
+            
+            #Store the task ID in the session
+            session['task_id'] = task_id
+            
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             #Save the uploaded file to the server
             file.save(filepath)
             
-            try:
-                #Process the audio file with the configured parameters
-                result = get_audio_processor().process_audio(
-                    filepath, 
-                    inference_steps=inference_steps,
-                    enable_noise=enable_noise,
-                    noise_offset=noise_offset,
-                    noise_std=noise_std
-                )
-                
-                #Prepare file paths for template rendering
-                #Convert OS-specific paths to web-friendly URL paths
-                original_audio = 'cache/uploads/' + filename
-                enhanced_audio = result['enhanced_audio_path']
-                
-                #Render results page with all processed audio data and visualizations
-                return render_template('results.html', 
-                                      title='Results',
-                                      original_audio=original_audio,
-                                      fixed_audio=enhanced_audio,
-                                      original_waveform=result['original_waveform'],
-                                      enhanced_waveform=result['enhanced_waveform'],
-                                      original_spectrogram=result['original_spectrogram'],
-                                      enhanced_spectrogram=result['enhanced_spectrogram'])
-            except Exception as e:
-                #Handle any processing errors and inform the user
-                flash(f'Error processing audio: {str(e)}', 'error')
-                return redirect(request.url)
+            #Initialize task in background_tasks
+            background_tasks[task_id] = {
+                'status': 'starting',
+                'message': 'Preparing to process',
+                'current': 0,
+                'total': 0,
+                'result': None,
+                'error': None,
+                'done': False
+            }
+            
+            #Start processing in a background thread
+            processing_thread = threading.Thread(
+                target=process_audio_task,
+                args=(task_id, filepath, inference_steps, enable_noise, noise_offset, noise_std)
+            )
+            processing_thread.daemon = True
+            processing_thread.start()
+            
+            #Redirect to processing page
+            return redirect(url_for('process_page'))
         else:
             #Inform user about allowed file types if they upload an unsupported format
             flash('File type not allowed. Please upload WAV, MP3, OGG, or FLAC files.', 'error')
@@ -137,6 +140,37 @@ def process():
     
     #For GET request, show the processing form page
     return render_template('process.html', title='Fix Audio')
+
+def process_audio_task(task_id, filepath, inference_steps, enable_noise, noise_offset, noise_std):
+    """Process audio in a background thread"""
+    try:
+        # Update task status
+        background_tasks[task_id]['status'] = 'processing'
+        background_tasks[task_id]['message'] = 'Starting audio processing'
+        
+        # Process the audio file with the configured parameters
+        result = get_audio_processor().process_audio(
+            filepath, 
+            inference_steps=inference_steps,
+            enable_noise=enable_noise,
+            noise_offset=noise_offset,
+            noise_std=noise_std
+        )
+        
+        # Store result for later retrieval
+        background_tasks[task_id]['result'] = result
+        background_tasks[task_id]['status'] = 'completed'
+        background_tasks[task_id]['message'] = 'Processing complete'
+        background_tasks[task_id]['done'] = True
+        
+    except Exception as e:
+        # Handle processing errors
+        error_msg = f"Error processing audio: {str(e)}"
+        background_tasks[task_id]['status'] = 'error'
+        background_tasks[task_id]['message'] = error_msg
+        background_tasks[task_id]['error'] = str(e)
+        background_tasks[task_id]['done'] = True
+        print(f"Error in processing task: {error_msg}")
 
 @app.route('/progress')
 def progress():
@@ -193,16 +227,81 @@ def progress():
 
 @app.route('/progress_status')
 def progress_status():
-    """Polling fallback endpoint for when SSE doesn't work"""
-    progress_data = session.get('progress_data', {})
-    status = progress_data.get('status', {
-        'message': 'Waiting for processing to begin...',
+    """Polling endpoint to check progress (fallback for when SSE doesn't work)"""
+    task_id = session.get('task_id')
+    
+    if task_id and task_id in background_tasks:
+        task_data = background_tasks[task_id].copy()
+        
+        # If there's no specific data from background task, try to get it from audio processor
+        if task_data['current'] == 0 and task_data['total'] == 0:
+            progress_data = get_audio_processor().get_progress()
+            task_data.update(progress_data)
+        
+        # Add timestamp to prevent caching
+        task_data['timestamp'] = int(time.time() * 1000)
+        return jsonify(task_data)
+    
+    # Default response when no task is found
+    return jsonify({
+        'status': 'unknown',
+        'message': 'No active processing task found',
         'current': 0,
         'total': 0,
-        'done': False
+        'done': False,
+        'timestamp': int(time.time() * 1000)
     })
+
+@app.route('/task_result')
+def task_result():
+    """Get the result of a completed task"""
+    task_id = session.get('task_id')
     
-    return jsonify(status)
+    if not task_id or task_id not in background_tasks:
+        flash('Task not found or has expired', 'error')
+        return redirect(url_for('process'))
+    
+    task_data = background_tasks[task_id]
+    
+    if task_data['status'] == 'error':
+        flash(f"Error processing audio: {task_data['error']}", 'error')
+        return redirect(url_for('process'))
+    
+    if task_data['status'] != 'completed':
+        flash('Processing is not complete yet', 'warning')
+        return redirect(url_for('process_page'))
+    
+    result = task_data['result']
+    if not result:
+        flash('Processing result not found', 'error')
+        return redirect(url_for('process'))
+    
+    # Clean up task data from memory after retrieving result
+    # but keep it around for a bit in case of page refreshes
+    # Use a separate thread to clean it up after a delay
+    def cleanup_task():
+        time.sleep(300)  # Keep result for 5 minutes
+        if task_id in background_tasks:
+            del background_tasks[task_id]
+    
+    cleanup_thread = threading.Thread(target=cleanup_task)
+    cleanup_thread.daemon = True
+    cleanup_thread.start()
+    
+    # Prepare file paths for template rendering
+    original_audio = os.path.basename(result['original_audio_path'])
+    original_audio = f"cache/uploads/{original_audio}"
+    enhanced_audio = result['enhanced_audio_path']
+    
+    # Render results page with all processed audio data and visualizations
+    return render_template('results.html', 
+                          title='Results',
+                          original_audio=original_audio,
+                          fixed_audio=enhanced_audio,
+                          original_waveform=result['original_waveform'],
+                          enhanced_waveform=result['enhanced_waveform'],
+                          original_spectrogram=result['original_spectrogram'],
+                          enhanced_spectrogram=result['enhanced_spectrogram'])
 
 @app.route('/process_page')
 def process_page():

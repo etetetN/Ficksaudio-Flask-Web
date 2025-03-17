@@ -542,9 +542,7 @@ input:checked + .slider:before {
         }
         
         // Start progress monitoring
-        if (typeof startProgressMonitoring === 'function') {
-            startProgressMonitoring();
-        }
+        startProgressMonitoring();
         
         // Mark upload step as completed
         const stepUpload = document.getElementById('step-upload');
@@ -711,141 +709,160 @@ input:checked + .slider:before {
     }
     
     function startProgressMonitoring() {
-        const eventSource = new EventSource('/progress');
+        // Initialize variables for tracking progress UI
         const progressMessage = document.getElementById('progress-message');
         const progressCount = document.getElementById('progress-count');
         const progressFill = document.getElementById('progress-fill');
         
-        eventSource.onmessage = function(e) {
-            try {
-                const progress = JSON.parse(e.data);
-                
-                //Update progress bar
-                if (progress.total > 0) {
-                    const percent = (progress.current / progress.total) * 100;
-                    progressFill.style.width = `${percent}%`;
-                }
-                
-                //Update message
-                if (progress.message) {
-                    progressMessage.textContent = progress.message;
-                }
-                
-                //Update count
-                if (progress.current !== undefined && progress.total !== undefined) {
-                    progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
-                }
-                
-                // Update steps based on progress message
-                if (progress.current > 0 && progress.current < progress.total) {
-                    document.getElementById('step-upload').classList.add('completed');
-                    document.getElementById('step-convert').classList.add('completed');
-                    document.getElementById('step-enhance').classList.add('active');
-                } else if (progress.message && progress.message.includes('Converting')) {
-                    document.getElementById('step-upload').classList.add('completed');
-                    document.getElementById('step-convert').classList.add('active');
-                } else if (progress.done) {
-                    document.getElementById('step-upload').classList.add('completed');
-                    document.getElementById('step-convert').classList.add('completed');
-                    document.getElementById('step-enhance').classList.add('completed');
-                    document.getElementById('step-finalize').classList.add('active');
-                }
-                
-                //Close connection when done
-                if (progress.done) {
-                    eventSource.close();
-                    
-                    // Redirect to results page after a short delay
-                    setTimeout(() => {
-                        window.location.href = '/results';
-                    }, 1500);
-                }
-                
-                //Force DOM update
-                progressMessage.style.display = 'none';
-                progressMessage.offsetHeight; //Force reflow
-                progressMessage.style.display = 'block';
-                
-                progressCount.style.display = 'none';
-                progressCount.offsetHeight; //Force reflow
-                progressCount.style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error parsing progress data:', error);
-            }
-        };
+        // First, try to use EventSource (SSE) which works best on local development
+        let usePolling = false;
+        let sseTimeout;
         
-        eventSource.onerror = function(e) {
-            console.error('EventSource failed:', e);
-            eventSource.close();
-            
-            // Set up polling as fallback
+        // Set a timeout to switch to polling if SSE doesn't work or respond within 3 seconds
+        sseTimeout = setTimeout(() => {
+            console.log("SSE not responding in time, switching to polling");
+            usePolling = true;
             setupPolling();
-        };
-    }
-    
-    function setupPolling() {
-        console.log('Setting up polling fallback');
-        const pollInterval = 3000; // 3 seconds
-        const progressMessage = document.getElementById('progress-message');
-        const progressCount = document.getElementById('progress-count');
-        const progressFill = document.getElementById('progress-fill');
+        }, 3000);
         
-        const checkProgress = async () => {
-            try {
-                const response = await fetch('/progress_status');
-                if (response.ok) {
-                    const progress = await response.json();
+        try {
+            const eventSource = new EventSource('/progress');
+            
+            eventSource.onopen = function() {
+                // SSE connection established successfully, cancel the timeout
+                clearTimeout(sseTimeout);
+                console.log("SSE connection established");
+            };
+            
+            eventSource.onmessage = function(e) {
+                // SSE is working, cancel the timeout if it's still active
+                clearTimeout(sseTimeout);
+                
+                try {
+                    const progress = JSON.parse(e.data);
+                    updateProgressUI(progress);
                     
-                    //Update progress bar
-                    if (progress.total > 0) {
-                        const percent = (progress.current / progress.total) * 100;
-                        progressFill.style.width = `${percent}%`;
-                    }
-                    
-                    //Update message
-                    if (progress.message) {
-                        progressMessage.textContent = progress.message;
-                    }
-                    
-                    //Update count
-                    if (progress.current !== undefined && progress.total !== undefined) {
-                        progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
-                    }
-                    
-                    // Update steps based on progress message
-                    if (progress.current > 0 && progress.current < progress.total) {
-                        document.getElementById('step-upload').classList.add('completed');
-                        document.getElementById('step-convert').classList.add('completed');
-                        document.getElementById('step-enhance').classList.add('active');
-                    } else if (progress.message && progress.message.includes('Converting')) {
-                        document.getElementById('step-upload').classList.add('completed');
-                        document.getElementById('step-convert').classList.add('active');
-                    } else if (progress.done) {
-                        document.getElementById('step-upload').classList.add('completed');
-                        document.getElementById('step-convert').classList.add('completed');
-                        document.getElementById('step-enhance').classList.add('completed');
-                        document.getElementById('step-finalize').classList.add('active');
+                    // Close connection when done
+                    if (progress.done) {
+                        eventSource.close();
                         
                         // Redirect to results page after a short delay
-                        setTimeout(() => {
-                            window.location.href = '/results';
-                        }, 1500);
-                        
-                        clearInterval(pollingId);
+                        checkAndRedirectToResults();
                     }
-                    
-                } else {
-                    console.error('Error fetching progress status:', response.statusText);
+                } catch (error) {
+                    console.error('Error parsing progress data:', error);
                 }
-            } catch (error) {
-                console.error('Error in polling:', error);
-            }
-        };
+            };
+            
+            eventSource.onerror = function(e) {
+                console.error('EventSource failed:', e);
+                eventSource.close();
+                
+                // Fall back to polling
+                if (!usePolling) {
+                    usePolling = true;
+                    setupPolling();
+                }
+            };
+        } catch (error) {
+            console.error('Error setting up EventSource:', error);
+            // Fall back to polling immediately
+            usePolling = true;
+            setupPolling();
+        }
         
-        // Start polling
-        const pollingId = setInterval(checkProgress, pollInterval);
-        checkProgress(); // Call immediately for first update
+        function updateProgressUI(progress) {
+            // Update progress bar
+            if (progress.total > 0) {
+                const percent = (progress.current / progress.total) * 100;
+                progressFill.style.width = `${percent}%`;
+            }
+            
+            // Update message
+            if (progress.message) {
+                progressMessage.textContent = progress.message;
+            }
+            
+            // Update count
+            if (progress.current !== undefined && progress.total !== undefined) {
+                progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
+            }
+            
+            // Update steps based on progress or status
+            updateStepsUI(progress);
+        }
+        
+        function updateStepsUI(progress) {
+            const stepUpload = document.getElementById('step-upload');
+            const stepConvert = document.getElementById('step-convert');
+            const stepEnhance = document.getElementById('step-enhance');
+            const stepFinalize = document.getElementById('step-finalize');
+            
+            // Always mark upload as completed first
+            stepUpload.classList.add('completed');
+            
+            // Update based on status or progress message
+            if (progress.status === 'completed' || progress.done) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('completed');
+                stepEnhance.classList.add('completed');
+                stepFinalize.classList.add('active');
+            } else if (progress.status === 'processing' || (progress.current > 0 && progress.current < progress.total)) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('completed');
+                stepEnhance.classList.add('active');
+            } else if (progress.message && (
+                progress.message.includes('Converting') || 
+                progress.message.includes('Preparing')
+            )) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('active');
+            }
+        }
+        
+        function setupPolling() {
+            console.log('Setting up polling for progress updates');
+            const pollInterval = 2000; // 2 seconds
+            
+            function poll() {
+                fetch('/progress_status?' + new Date().getTime())
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        }
+                        throw new Error('Network response was not ok');
+                    })
+                    .then(progress => {
+                        updateProgressUI(progress);
+                        
+                        // Check if processing is done
+                        if (progress.done || progress.status === 'completed') {
+                            checkAndRedirectToResults();
+                            return;
+                        }
+                        
+                        // Continue polling
+                        setTimeout(poll, pollInterval);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching progress:', error);
+                        // Keep polling even on error
+                        setTimeout(poll, pollInterval);
+                    });
+            }
+            
+            // Start polling
+            poll();
+        }
+        
+        function checkAndRedirectToResults() {
+            console.log("Processing complete, checking results");
+            
+            // First try to go to task result page which will either show results or redirect
+            setTimeout(() => {
+                window.location.href = '/task_result';
+            }, 1500);
+        }
     }
     
     //Update form submit handler
@@ -862,7 +879,6 @@ input:checked + .slider:before {
         document.getElementById('progress-fill').style.width = '0%';
         
         processingOverlay.classList.add('active');
-        startProgressMonitoring();
     });
     
     //Audio player events
