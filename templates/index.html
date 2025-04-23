@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-content">
+        <h1 class="glitch-text" data-text="FIcksAudio">FIcksAudio</h1>
+        <p class="hero-description">An experimental AI diffusion model audio enhancement tool</p>
+        <div class="hero-actions">
+            <a href="{{ url_for('process') }}" class="btn btn-primary btn-large">
+                <span class="btn-text">Test on my audio</span>
+                <span class="btn-icon"><i class="fas fa-magic"></i></span>
+            </a>
+        </div>
+    </div>
+    
+    <div class="hero-visual">
+        <div class="audio-wave">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+    </div>
+</section>
+
+<section class="features">
+    <div class="feature">
+        <div class="feature-icon">
+            <i class="fas fa-upload"></i>
+        </div>
+        <h2>Upload</h2>
+        <p>Drag & drop your audio file</p>
+    </div>
+    <div class="feature">
+        <div class="feature-icon">
+            <i class="fas fa-robot"></i>
+        </div>
+        <h2>Process</h2>
+        <p>AI enhances your audio</p>
+    </div>
+    <div class="feature">
+        <div class="feature-icon">
+            <i class="fas fa-download"></i>
+        </div>
+        <h2>Download</h2>
+        <p>Get your enhanced audio</p>
+    </div>
+</section>
+
+<section class="tech-info">
+    <h2>For AI Enthusiasts</h2>
+    <p>FIcksAudio uses diffusion model technology to enhance and fix problematic elements in your audio files. Please note that results may vary depending on the input quality.</p>
+    
+    <div class="tech-details">
+        <div class="tech-item">
+            <h3>Supported Formats</h3>
+            <ul>
+                <li>WAV</li>
+                <li>MP3</li>
+                <li>OGG</li>
+                <li>FLAC</li>
+            </ul>
+        </div>
+        <div class="tech-item">
+            <h3>File Limits</h3>
+            <p>Maximum 16MB file size. Larger files can be split into segments for better processing.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    //Animated waveform visualization
+    const waveBars = document.querySelectorAll('.wave-bar');
+    
+    function animateWave() {
+        waveBars.forEach(bar => {
+            const height = Math.floor(Math.random() * 80) + 10;
+            bar.style.height = `${height}%`;
+        });
+    }
+    
+    //Initialize waveform animation
+    animateWave();
+    
+    //Continue animation at regular intervals
+    setInterval(animateWave, 300);
+</script>
+{% endblock %} 

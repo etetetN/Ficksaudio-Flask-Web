@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+.vercel
+*.pyc
+.DS_Store
+node_modules/
+/tmp
+static/uploads/*
+static/enhanced/*
+static/cache/*
+!static/uploads/.gitkeep
+!static/enhanced/.gitkeep
+!static/cache/.gitkeep 

@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="results-section">
+    <h1 class="glitch-text" data-text="Enhancement Results">Enhancement Results</h1>
+    <p class="section-description">Compare your original audio with the AI-enhanced version</p>
+    
+    <div class="results-container">
+        <div class="result-card original-audio">
+            <div class="result-header">
+                <h2>Original Audio</h2>
+                <div class="audio-info">
+                    <span class="info-label">Source File</span>
+                </div>
+            </div>
+            
+            <div class="audio-player-container">
+                <div class="audio-player">
+                    <audio id="original-audio" controls>
+                        <source src="{{ url_for('static', filename=original_audio) }}" type="audio/wav">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="playback-visualizer" id="original-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+                    <div class="loading-indicator" id="original-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Loading audio...
+                    </div>
+                    <div class="error-message" id="original-error">
+                        <i class="fas fa-exclamation-triangle"></i> Error loading audio
+                    </div>
+                </div>
+            </div>
+            
+            <div class="visualization-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="original-waveform">Waveform</button>
+                    <button class="tab-btn" data-tab="original-spectrogram">Spectrogram</button>
+                </div>
+                <div class="tab-content" id="original-waveform">
+                    <canvas id="original-waveform-canvas"></canvas>
+                    <div class="visualization-loading" id="original-waveform-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                    </div>
+                </div>
+                <div class="tab-content" id="original-spectrogram">
+                    <canvas id="original-spectrogram-canvas"></canvas>
+                    <div class="visualization-loading" id="original-spectrogram-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                    </div>
+                </div>
+            </div>
+            
+            <a href="{{ url_for('static', filename=original_audio) }}" download class="btn btn-secondary" id="original-download-btn">
+                <span class="btn-text">Download Original</span>
+                <span class="btn-icon"><i class="fas fa-download"></i></span>
+            </a>
+        </div>
+        
+        <div class="result-card enhanced-audio">
+            <div class="result-header">
+                <h2>Enhanced Audio</h2>
+                <div class="audio-info">
+                    <span class="info-label">AI-Enhanced</span>
+                </div>
+            </div>
+            
+            <div class="audio-player-container">
+                <div class="audio-player">
+                    <audio id="enhanced-audio" controls>
+                        <source src="{{ url_for('static', filename=fixed_audio) }}" type="audio/wav">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="playback-visualizer" id="enhanced-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+                    <div class="loading-indicator" id="enhanced-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Loading audio...
+                    </div>
+                    <div class="error-message" id="enhanced-error">
+                        <i class="fas fa-exclamation-triangle"></i> Error loading audio
+                    </div>
+                </div>
+            </div>
+            
+            <div class="visualization-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="fixed-waveform">Waveform</button>
+                    <button class="tab-btn" data-tab="fixed-spectrogram">Spectrogram</button>
+                </div>
+                <div class="tab-content" id="fixed-waveform">
+                    <canvas id="fixed-waveform-canvas"></canvas>
+                    <div class="visualization-loading" id="enhanced-waveform-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                    </div>
+                </div>
+                <div class="tab-content" id="fixed-spectrogram">
+                    <canvas id="fixed-spectrogram-canvas"></canvas>
+                    <div class="visualization-loading" id="enhanced-spectrogram-loading">
+                        <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                    </div>
+                </div>
+            </div>
+            
+            <a href="{{ url_for('static', filename=fixed_audio) }}" download class="btn btn-primary" id="enhanced-download-btn">
+                <span class="btn-text">Download Enhanced</span>
+                <span class="btn-icon"><i class="fas fa-download"></i></span>
+            </a>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="{{ url_for('process') }}" class="btn btn-outline">
+            <span class="btn-text">Process Another File</span>
+            <span class="btn-icon"><i class="fas fa-undo"></i></span>
+        </a>
+    </div>
+    
+    <div class="experimental-notice">
+        <i class="fas fa-flask"></i>
+        <p>This is an experimental model for AI enthusiasts. Results may vary.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    //Visualization cache to improve performance
+    const visualizationCache = {};
+    
+    //Initialize visualizations when page loads
+    window.addEventListener('load', () => {
+        //Pre-render all visualizations for better performance
+        preRenderVisualizations();
+        
+        //Draw initial views (waveforms)
+        drawCachedVisualization('original-waveform-canvas', visualizationCache.originalWaveform);
+        drawCachedVisualization('fixed-waveform-canvas', visualizationCache.enhancedWaveform);
+        
+        //Hide loading indicators once visualizations are ready
+        document.querySelectorAll('.visualization-loading').forEach(loader => {
+            loader.style.display = 'none';
+        });
+    });
+    
+    //Pre-render visualizations to optimize performance
+    function preRenderVisualizations() {
+        const waveformWidth = 800;
+        const waveformHeight = 200;
+        
+        //Pre-render waveforms for both original and enhanced audio
+        visualizationCache.originalWaveform = renderWaveform(
+            {{ original_waveform|tojson }},
+            'rgb(74, 111, 165)',
+            waveformWidth,
+            waveformHeight
+        );
+        
+        visualizationCache.enhancedWaveform = renderWaveform(
+            {{ enhanced_waveform|tojson }},
+            'rgb(255, 87, 151)',
+            waveformWidth,
+            waveformHeight
+        );
+        
+        //Pre-render spectrograms for both original and enhanced audio
+        visualizationCache.originalSpectrogram = renderSpectrogram(
+            {{ original_spectrogram|tojson }},
+            'rgb(74, 111, 165)',
+            waveformWidth,
+            waveformHeight
+        );
+        
+        visualizationCache.enhancedSpectrogram = renderSpectrogram(
+            {{ enhanced_spectrogram|tojson }},
+            'rgb(255, 87, 151)',
+            waveformWidth,
+            waveformHeight
+        );
+    }
+    
+    //Tab switching functionality for visualization types
+    document.querySelectorAll('.tab-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabsContainer = button.parentElement;
+            const contentContainer = tabsContainer.nextElementSibling;
+            const tabToShow = button.getAttribute('data-tab');
+            
+            //Update active tab button
+            tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            button.classList.add('active');
+            
+            //Show corresponding tab content
+            contentContainer.parentElement.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabToShow).classList.add('active');
+            
+            //Draw visualization if it's a spectrogram tab
+            if (tabToShow === 'original-spectrogram') {
+                drawCachedVisualization('original-spectrogram-canvas', visualizationCache.originalSpectrogram);
+            } else if (tabToShow === 'fixed-spectrogram') {
+                drawCachedVisualization('fixed-spectrogram-canvas', visualizationCache.enhancedSpectrogram);
+            }
+        });
+    });
+    
+    //Draw a pre-rendered visualization onto a canvas
+    function drawCachedVisualization(canvasId, cachedVisual) {
+        if (!cachedVisual) return;
+        
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        canvas.width = cachedVisual.width;
+        canvas.height = cachedVisual.height;
+        ctx.drawImage(cachedVisual, 0, 0);
+    }
+    
+    //Render waveform visualization
+    function renderWaveform(waveformData, color, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        //Clear canvas
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, width, height);
+        
+        //Set wave style
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = color;
+        
+        //Calculate scaling factors
+        const verticalCenter = height / 2;
+        const verticalScale = height / 2.5;
+        const horizontalScale = width / waveformData.length;
+        
+        //Begin drawing waveform path
+        ctx.beginPath();
+        ctx.moveTo(0, verticalCenter);
+        
+        //Draw waveform points
+        for (let i = 0; i < waveformData.length; i++) {
+            const x = i * horizontalScale;
+            const y = verticalCenter + waveformData[i] * verticalScale;
+            ctx.lineTo(x, y);
+        }
+        
+        //Stroke the path
+        ctx.stroke();
+        
+        //Add a subtle glow effect
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 5;
+        ctx.stroke();
+        
+        return canvas;
+    }
+    
+    //Render spectrogram visualization
+    function renderSpectrogram(spectrogramData, color, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        //Clear canvas
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, width, height);
+        
+        //Get data dimensions
+        const numRows = spectrogramData.length;
+        const numCols = spectrogramData[0].length;
+        
+        //Calculate pixel size
+        const pixelWidth = width / numCols;
+        const pixelHeight = height / numRows;
+        
+        //Draw spectrogram
+        for (let i = 0; i < numRows; i++) {
+            for (let j = 0; j < numCols; j++) {
+                const value = spectrogramData[i][j];
+                const intensity = value * 255;
+                
+                //Create a gradient color based on intensity
+                const r = parseInt(color.match(/\d+/g)[0]);
+                const g = parseInt(color.match(/\d+/g)[1]);
+                const b = parseInt(color.match(/\d+/g)[2]);
+                
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${value})`;
+                ctx.fillRect(j * pixelWidth, height - (i + 1) * pixelHeight, pixelWidth, pixelHeight);
+            }
+        }
+        
+        return canvas;
+    }
+    
+    //Audio playback visualization
+    const originalAudio = document.getElementById('original-audio');
+    const enhancedAudio = document.getElementById('enhanced-audio');
+    const originalVisualizer = document.querySelectorAll('#original-visualizer .visualizer-bar');
+    const enhancedVisualizer = document.querySelectorAll('#enhanced-visualizer .visualizer-bar');
+    
+    //Handle audio loading events
+    ['original-audio', 'enhanced-audio'].forEach(id => {
+        const audio = document.getElementById(id);
+        const loading = document.getElementById(id.replace('audio', 'loading'));
+        const error = document.getElementById(id.replace('audio', 'error'));
+        
+        //Handle loading states
+        audio.addEventListener('loadstart', () => {
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+        });
+        
+        audio.addEventListener('canplaythrough', () => {
+            loading.style.display = 'none';
+        });
+        
+        audio.addEventListener('error', () => {
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+        });
+    });
+    
+    //Animate visualizer bars during audio playback
+    function animateVisualizer(visualizerBars, isPlaying) {
+        visualizerBars.forEach(bar => {
+            if (isPlaying) {
+                const height = Math.floor(Math.random() * 80) + 10;
+                bar.style.height = `${height}%`;
+            } else {
+                bar.style.height = '10%';
+            }
+        });
+    }
+    
+    //Handle visualizer animation for original audio
+    let originalInterval;
+    originalAudio.addEventListener('play', () => {
+        clearInterval(originalInterval);
+        originalInterval = setInterval(() => animateVisualizer(originalVisualizer, true), 100);
+    });
+    
+    originalAudio.addEventListener('pause', () => {
+        clearInterval(originalInterval);
+        animateVisualizer(originalVisualizer, false);
+    });
+    
+    originalAudio.addEventListener('ended', () => {
+        clearInterval(originalInterval);
+        animateVisualizer(originalVisualizer, false);
+    });
+    
+    //Handle visualizer animation for enhanced audio
+    let enhancedInterval;
+    enhancedAudio.addEventListener('play', () => {
+        clearInterval(enhancedInterval);
+        enhancedInterval = setInterval(() => animateVisualizer(enhancedVisualizer, true), 100);
+    });
+    
+    enhancedAudio.addEventListener('pause', () => {
+        clearInterval(enhancedInterval);
+        animateVisualizer(enhancedVisualizer, false);
+    });
+    
+    enhancedAudio.addEventListener('ended', () => {
+        clearInterval(enhancedInterval);
+        animateVisualizer(enhancedVisualizer, false);
+    });
+</script>
+{% endblock %} 

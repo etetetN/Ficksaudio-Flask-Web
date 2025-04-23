@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if title %}{{ title }} - {% endif %}FIcksAudio</title>
+    <meta name="theme-color" content="#1e1e3e">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="description" content="FIcksAudio - An experimental AI diffusion model audio enhancement tool">
+</head>
+<body>
+    <!-- Abstract background elements -->
+    <div class="abstract-bg">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+        <div class="shape shape-5"></div>
+    </div>
+    
+    <!-- Header navigation -->
+    <header class="site-header">
+        <div class="container">
+            <a href="https://github.com/etetetN/Ficksaudio-Flask-Web" class="logo">
+                <span class="logo-text">FIcksAudio</span>
+            </a>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="{{ url_for('index') }}" class="nav-link {% if request.path == url_for('index') %}active{% endif %}">Home</a></li>
+                    <li><a href="{{ url_for('process') }}" class="nav-link {% if request.path == url_for('process') %}active{% endif %}">Process Audio</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <!-- Main content container -->
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash-message {{ category }}">
+                <div class="flash-content">
+                    <i class="fas fa-info-circle"></i>
+                    <span>{{ message }}</span>
+                </div>
+                <button type="button" class="close-flash">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer area with disclaimer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="disclaimer">
+                <p>FIcksAudio is an experimental AI model and results may vary. Not for commercial use.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Common JavaScript -->
+    <script>
+        //Flash message handling
+        document.addEventListener('DOMContentLoaded', function() {
+            //Close flash messages when clicked
+            const closeButtons = document.querySelectorAll('.close-flash');
+            closeButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const flashMessage = this.parentElement;
+                    flashMessage.classList.add('fade-out');
+                    setTimeout(() => {
+                        flashMessage.remove();
+                    }, 300);
+                });
+            });
+            
+            //Auto-hide flash messages after 5 seconds
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.classList.add('fade-out');
+                    setTimeout(() => {
+                        message.remove();
+                    }, 300);
+                }, 5000);
+            });
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

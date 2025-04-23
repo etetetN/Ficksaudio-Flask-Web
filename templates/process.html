@@ -1,0 +1,970 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* Slider and Processing Options Styles */
+.processing-options {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.option-group {
+    margin-bottom: 1.5rem;
+}
+
+.option-group:last-child {
+    margin-bottom: 0;
+}
+
+.option-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+/* Custom Slider Styling */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: linear-gradient(90deg, #2c3e50 0%, #3498db 100%);
+    border-radius: 4px;
+    outline: none;
+    margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3498db;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.8);
+    transform: scale(1.1);
+}
+
+/* Value Display */
+.value-display {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(52, 152, 219, 0.2);
+    border-radius: 20px;
+    color: #3498db;
+    font-weight: 600;
+    margin-left: 10px;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Toggle Switch */
+.switch-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+    margin-right: 10px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #2c3e50;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #3498db;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Noise Controls */
+.noise-controls {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(52, 152, 219, 0.1);
+    border-radius: 8px;
+    display: none;
+}
+
+.noise-controls.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.noise-parameter {
+    margin-bottom: 1rem;
+}
+
+.noise-parameter label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #bdc3c7;
+    font-size: 0.9em;
+}
+
+/* Info Icon */
+.info-icon {
+    display: inline-block;
+    margin-left: 5px;
+    color: #3498db;
+    cursor: help;
+}
+
+.info-icon:hover {
+    color: #2980b9;
+}
+
+.processing-content {
+    position: relative;
+    background: rgba(30, 30, 62, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 24px;
+    border: 1px solid rgba(106, 90, 205, 0.2);
+    padding: 2.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.processing-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(255, 87, 151, 0.05) 0%, 
+        rgba(106, 90, 205, 0.05) 50%,
+        rgba(0, 229, 255, 0.05) 100%);
+    z-index: -1;
+}
+
+.processing-spinner {
+    font-size: 3.5rem;
+    color: #ff5797;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 15px rgba(255, 87, 151, 0.6);
+    animation: spin 2s infinite linear, colorChange 4s infinite alternate;
+}
+
+@keyframes colorChange {
+    0% { color: #ff5797; text-shadow: 0 0 15px rgba(255, 87, 151, 0.6); }
+    50% { color: #6a5acd; text-shadow: 0 0 15px rgba(106, 90, 205, 0.6); }
+    100% { color: #00e5ff; text-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
+}
+
+.processing-content h3 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(45deg, #ff5797, #6a5acd, #00e5ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 700;
+}
+
+.progress-message {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    min-height: 1.8rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.progress-count {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1.5rem;
+    min-height: 1.2rem;
+}
+
+.progress-bar {
+    height: 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff5797, #6a5acd, #00e5ff);
+    background-size: 200% 100%;
+    animation: gradient-shift 2s linear infinite;
+    border-radius: 20px;
+    transition: width 0.3s ease;
+    position: relative;
+    width: 0%;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 255, 255, 0.3) 50%, 
+        rgba(255, 255, 255, 0) 100%);
+    animation: shine 1.5s infinite;
+}
+
+@keyframes shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* Processing Steps */
+.processing-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    opacity: 1;
+    transform: translateY(-5px);
+}
+
+.step.completed {
+    opacity: 1;
+}
+
+.step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 25px;
+    right: -50%;
+    width: 100%;
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.2);
+    z-index: 0;
+}
+
+.step.completed:not(:last-child)::after {
+    background: linear-gradient(90deg, #ff5797, #6a5acd);
+}
+
+.step-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: rgba(30, 30, 62, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    font-size: 1.2rem;
+    color: #ffffff;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s ease;
+}
+
+.step.active .step-icon {
+    background: linear-gradient(135deg, #ff5797, #6a5acd);
+    border-color: #ffffff;
+    box-shadow: 0 0 15px rgba(106, 90, 205, 0.5);
+    animation: pulse 2s infinite;
+}
+
+.step.completed .step-icon {
+    background: linear-gradient(135deg, #6a5acd, #00e5ff);
+    border-color: #ffffff;
+}
+
+.step-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+}
+
+.step.active .step-label {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Fun facts */
+.fun-fact-container {
+    margin-top: 2rem;
+    min-height: 80px;
+}
+
+.fun-fact {
+    background-color: rgba(0, 229, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    align-items: flex-start;
+    animation: fadeIn 0.5s ease;
+}
+
+.fun-fact i {
+    color: #00e5ff;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+    margin-top: 0.2rem;
+}
+
+.fun-fact p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+</style>
+
+<section class="process-section">
+    <h1 class="glitch-text" data-text="Fix Your Audio">Fix Your Audio</h1>
+    <p class="section-description">Upload your audio file and the AI will "enhance" it (may take a while)</p>
+    
+    <div class="upload-container">
+        <form action="{{ url_for('process') }}" method="post" enctype="multipart/form-data" id="upload-form">
+            <div class="file-upload">
+                <div class="file-upload-area" id="drop-area">
+                    <input type="file" name="audio_file" id="audio-file" accept=".wav,.mp3,.ogg,.flac" class="file-input" required>
+                    <label for="audio-file" class="file-label">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">
+                            <span class="primary-text">Drag & drop your audio file here</span>
+                            <span class="secondary-text">or click to browse</span>
+                            <span class="file-info" id="file-info">WAV, MP3, OGG, FLAC (Max 16MB)</span>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="selected-file" id="selected-file">
+                    <div class="file-details">
+                        <i class="fas fa-music file-icon"></i>
+                        <span class="file-name" id="file-name">No file selected</span>
+                    </div>
+                    <button type="button" class="remove-file" id="remove-file">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="processing-options">
+                <div class="option-group">
+                    <label for="inference-steps">Inference Steps <span class="value-display" id="steps-display">50</span></label>
+                    <input type="range" id="inference-steps" name="inference_steps" 
+                           min="20" max="100" value="50" step="1">
+                    <small class="help-text">Higher values = better quality but slower processing</small>
+                </div>
+
+                <div class="option-group">
+                    <div class="switch-container">
+                        <label class="switch">
+                            <input type="checkbox" id="enable-noise" name="enable_noise">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Enable Noisy Processing</span>
+                        <i class="fas fa-info-circle info-icon" title="Add noise to the input audio before processing. This can help the model better identify and remove noise patterns."></i>
+                    </div>
+
+                    <div class="noise-controls" id="noise-controls">
+                        <div class="noise-parameter">
+                            <label for="noise-offset">Noise Offset <span class="value-display" id="offset-display">20</span></label>
+                            <input type="range" id="noise-offset" name="noise_offset" 
+                                   min="10" max="30" value="20" step="1">
+                        </div>
+                        
+                        <div class="noise-parameter">
+                            <label for="noise-std">Noise Intensity <span class="value-display" id="std-display">15</span></label>
+                            <input type="range" id="noise-std" name="noise_std" 
+                                   min="5" max="25" value="15" step="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="audio-preview" id="audio-preview">
+                <h3>Preview</h3>
+                <div class="audio-player-container">
+                    <audio id="audio-player" controls></audio>
+                    <div class="audio-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-large process-btn" id="process-btn">
+                <span class="btn-text">Process Audio</span>
+                <span class="btn-icon"><i class="fas fa-magic"></i></span>
+            </button>
+        </form>
+    </div>
+    
+    <!-- Processing overlay -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="processing-content">
+            <div class="processing-spinner">
+                <i class="fas fa-cog fa-spin"></i>
+            </div>
+            <h3>Processing Your Audio</h3>
+            <div id="progress-message" class="progress-message">Initializing...</div>
+            <div id="progress-count" class="progress-count">Preparing to process...</div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="processing-steps">
+                <div class="step" id="step-upload">
+                    <div class="step-icon"><i class="fas fa-upload"></i></div>
+                    <div class="step-label">File Uploaded</div>
+                </div>
+                <div class="step" id="step-convert">
+                    <div class="step-icon"><i class="fas fa-wave-square"></i></div>
+                    <div class="step-label">Converting Audio</div>
+                </div>
+                <div class="step" id="step-enhance">
+                    <div class="step-icon"><i class="fas fa-magic"></i></div>
+                    <div class="step-label">Enhancing Audio</div>
+                </div>
+                <div class="step" id="step-finalize">
+                    <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="step-label">Finalizing Result</div>
+                </div>
+            </div>
+            <div class="fun-fact-container">
+                <div id="fun-fact" class="fun-fact">
+                    <i class="fas fa-lightbulb"></i>
+                    <p>Did you know? Our AI model processes audio in frequency-time space instead of raw waveforms.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="experimental-notice">
+        <i class="fas fa-flask"></i>
+        <p>This is an experimental AI model. Results may vary depending on input quality.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<!-- Set processing mode flag -->
+{% if processing %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize processing overlay
+        const processingOverlay = document.getElementById('processing-overlay');
+        if (processingOverlay) {
+            processingOverlay.classList.add('active');
+        }
+        
+        // Start progress monitoring
+        startProgressMonitoring();
+        
+        // Mark upload step as completed
+        const stepUpload = document.getElementById('step-upload');
+        if (stepUpload) {
+            stepUpload.classList.add('completed');
+        }
+        
+        // Start fun facts
+        const funFacts = [
+            "Our AI model processes audio in frequency-time space (spectrograms) instead of raw waveforms.",
+            "The model was trained on thousands of hours of audio data to learn how to distinguish noise from signal.",
+            "Audio enhancement uses a special algorithm known as a 'diffusion model', which gradually removes noise.",
+            "Each audio segment is processed through dozens of neural network steps to achieve the best quality.",
+            "The spectrogram visualization shows you the frequency content of your audio over time.",
+            "Lower frequencies (bass sounds) appear at the bottom of spectrograms, while higher frequencies are at the top.",
+            "Our model can help reduce background noise, hiss, and improve overall clarity.",
+            "Bright spots in the enhanced spectrogram indicate stronger audio signals.",
+            "The neural network has over 30 million parameters that work together to enhance your audio.",
+            "Audio processing utilizes your computer's CPU and memory resources to run complex calculations."
+        ];
+        
+        // Show random fun facts every 8 seconds
+        const factElement = document.getElementById('fun-fact');
+        if (factElement) {
+            window.factInterval = setInterval(() => {
+                const randomFact = funFacts[Math.floor(Math.random() * funFacts.length)];
+                factElement.style.opacity = 0;
+                
+                setTimeout(() => {
+                    factElement.innerHTML = `<i class="fas fa-lightbulb"></i><p>${randomFact}</p>`;
+                    factElement.style.opacity = 1;
+                }, 500);
+            }, 8000);
+        }
+    });
+</script>
+{% endif %}
+
+<script>
+    //File upload handling
+    const dropArea = document.getElementById('drop-area');
+    const fileInput = document.getElementById('audio-file');
+    const fileInfo = document.getElementById('file-info');
+    const selectedFile = document.getElementById('selected-file');
+    const fileName = document.getElementById('file-name');
+    const removeFile = document.getElementById('remove-file');
+    const audioPreview = document.getElementById('audio-preview');
+    const audioPlayer = document.getElementById('audio-player');
+    const uploadForm = document.getElementById('upload-form');
+    const processBtn = document.getElementById('process-btn');
+    const processingOverlay = document.getElementById('processing-overlay');
+    const progressFill = document.getElementById('progress-fill');
+    const visualizerBars = document.querySelectorAll('.visualizer-bar');
+    
+    //Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    //Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight() {
+        dropArea.classList.add('highlight');
+    }
+    
+    function unhighlight() {
+        dropArea.classList.remove('highlight');
+    }
+    
+    //Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length) {
+            fileInput.files = files;
+            updateFileInfo();
+        }
+    }
+    
+    //Handle selected files
+    fileInput.addEventListener('change', updateFileInfo);
+    
+    function updateFileInfo() {
+        if (fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            
+            //Check file type
+            const fileType = file.type;
+            if (!fileType.match('audio.*')) {
+                alert('Please select an audio file');
+                resetFileInput();
+                return;
+            }
+            
+            //Check file size (max 16MB)
+            if (file.size > 16 * 1024 * 1024) {
+                alert('File size exceeds 16MB limit');
+                resetFileInput();
+                return;
+            }
+            
+            //Update UI
+            fileName.textContent = file.name;
+            selectedFile.classList.add('active');
+            
+            //Create audio preview
+            const url = URL.createObjectURL(file);
+            audioPlayer.src = url;
+            audioPreview.classList.add('active');
+            
+            //Start visualizer animation
+            startVisualizer();
+        }
+    }
+    
+    //Remove selected file
+    removeFile.addEventListener('click', resetFileInput);
+    
+    function resetFileInput() {
+        fileInput.value = '';
+        selectedFile.classList.remove('active');
+        audioPreview.classList.remove('active');
+        audioPlayer.src = '';
+        stopVisualizer();
+    }
+    
+    //Audio visualizer animation
+    let visualizerInterval;
+    
+    function startVisualizer() {
+        if (visualizerInterval) clearInterval(visualizerInterval);
+        
+        visualizerInterval = setInterval(() => {
+            visualizerBars.forEach(bar => {
+                const height = Math.floor(Math.random() * 100);
+                bar.style.height = `${height}%`;
+            });
+        }, 100);
+    }
+    
+    function stopVisualizer() {
+        if (visualizerInterval) {
+            clearInterval(visualizerInterval);
+            visualizerBars.forEach(bar => {
+                bar.style.height = '10%';
+            });
+        }
+    }
+    
+    function startProgressMonitoring() {
+        // Initialize variables for tracking progress UI
+        const progressMessage = document.getElementById('progress-message');
+        const progressCount = document.getElementById('progress-count');
+        const progressFill = document.getElementById('progress-fill');
+        
+        // First, try to use EventSource (SSE) which works best on local development
+        let usePolling = false;
+        let sseTimeout;
+        let eventSource = null;
+        let pollingInterval = null;
+
+        // On PythonAnywhere, polling every 2-3 seconds is more reliable than SSE
+        // Check if we're on PythonAnywhere by looking for its domain in the URL
+        if (window.location.hostname.includes('pythonanywhere.com')) {
+            console.log("Detected PythonAnywhere environment, using polling by default");
+            usePolling = true;
+            setupPolling();
+        } else {
+            // On other environments, try SSE first with a timeout fallback
+            console.log("Attempting to use SSE with polling fallback");
+            
+            // Set a timeout to switch to polling if SSE doesn't work or respond within 5 seconds
+            sseTimeout = setTimeout(() => {
+                console.log("SSE not responding in time, switching to polling");
+                usePolling = true;
+                
+                // Close the existing EventSource if it exists
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                
+                setupPolling();
+            }, 5000);
+            
+            try {
+                eventSource = new EventSource('/progress');
+                
+                eventSource.onopen = function() {
+                    // SSE connection established successfully, cancel the timeout
+                    clearTimeout(sseTimeout);
+                    console.log("SSE connection established");
+                };
+                
+                eventSource.onmessage = function(e) {
+                    // SSE is working, cancel the timeout if it's still active
+                    clearTimeout(sseTimeout);
+                    
+                    try {
+                        const progress = JSON.parse(e.data);
+                        updateProgressUI(progress);
+                        
+                        // Handle reconnect request or stream timeout
+                        if (progress.reconnect) {
+                            console.log("Server requested reconnection, switching to polling");
+                            eventSource.close();
+                            setupPolling();
+                            return;
+                        }
+                        
+                        // Close connection when done
+                        if (progress.done || progress.status === 'completed') {
+                            eventSource.close();
+                            
+                            // Redirect to results page after a short delay
+                            checkAndRedirectToResults();
+                        }
+                    } catch (error) {
+                        console.error('Error parsing progress data:', error);
+                    }
+                };
+                
+                eventSource.onerror = function(e) {
+                    console.error('EventSource failed:', e);
+                    
+                    // Close the connection on error
+                    eventSource.close();
+                    eventSource = null;
+                    
+                    // Fall back to polling
+                    if (!usePolling) {
+                        usePolling = true;
+                        setupPolling();
+                    }
+                };
+            } catch (error) {
+                console.error('Error setting up EventSource:', error);
+                // Fall back to polling immediately
+                usePolling = true;
+                setupPolling();
+            }
+        }
+        
+        function updateProgressUI(progress) {
+            console.log("Progress update:", progress);
+            
+            // Update progress bar
+            if (progress.total > 0) {
+                const percent = (progress.current / progress.total) * 100;
+                progressFill.style.width = `${percent}%`;
+            }
+            
+            // Update message
+            if (progress.message) {
+                progressMessage.textContent = progress.message;
+            }
+            
+            // Update count
+            if (progress.current !== undefined && progress.total !== undefined) {
+                progressCount.textContent = `Processing segment ${progress.current} of ${progress.total}`;
+            }
+            
+            // Update steps based on progress or status
+            updateStepsUI(progress);
+        }
+        
+        function updateStepsUI(progress) {
+            const stepUpload = document.getElementById('step-upload');
+            const stepConvert = document.getElementById('step-convert');
+            const stepEnhance = document.getElementById('step-enhance');
+            const stepFinalize = document.getElementById('step-finalize');
+            
+            // Always mark upload as completed first
+            stepUpload.classList.add('completed');
+            
+            // Update based on status or progress message
+            if (progress.status === 'completed' || progress.done) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('completed');
+                stepEnhance.classList.add('completed');
+                stepFinalize.classList.add('active');
+                stepFinalize.classList.add('completed');
+            } else if (progress.status === 'processing' || (progress.current > 0 && progress.current < progress.total)) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('completed');
+                stepEnhance.classList.add('active');
+            } else if (progress.message && (
+                progress.message.includes('Converting') || 
+                progress.message.includes('Preparing')
+            )) {
+                stepUpload.classList.add('completed');
+                stepConvert.classList.add('active');
+            }
+        }
+        
+        function setupPolling() {
+            console.log('Setting up polling for progress updates');
+            const pollInterval = 2000; // 2 seconds
+            
+            // Clear any existing polling interval
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            function poll() {
+                // Add cache-busting timestamp to URL
+                fetch(`/progress_status?t=${new Date().getTime()}`)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        }
+                        throw new Error('Network response was not ok');
+                    })
+                    .then(progress => {
+                        updateProgressUI(progress);
+                        
+                        // Check if processing is done
+                        if (progress.done || progress.status === 'completed') {
+                            console.log("Processing complete, stopping polling");
+                            if (pollingInterval) {
+                                clearInterval(pollingInterval);
+                            }
+                            checkAndRedirectToResults();
+                            return;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching progress:', error);
+                        // Keep polling even on error
+                    });
+            }
+            
+            // Poll immediately once
+            poll();
+            
+            // Then set up interval polling
+            pollingInterval = setInterval(poll, pollInterval);
+        }
+        
+        function checkAndRedirectToResults() {
+            console.log("Processing complete, checking results");
+            
+            // Add a small delay before redirecting
+            setTimeout(() => {
+                window.location.href = '/task_result';
+            }, 1500);
+        }
+    }
+    
+    //Update form submit handler
+    uploadForm.addEventListener('submit', function(e) {
+        if (!fileInput.files || !fileInput.files[0]) {
+            e.preventDefault();
+            alert('Please select an audio file first');
+            return;
+        }
+        
+        //Reset progress elements
+        document.getElementById('progress-message').textContent = 'Preparing to process...';
+        document.getElementById('progress-count').textContent = '';
+        document.getElementById('progress-fill').style.width = '0%';
+        
+        processingOverlay.classList.add('active');
+    });
+    
+    //Audio player events
+    audioPlayer.addEventListener('play', startVisualizer);
+    audioPlayer.addEventListener('pause', stopVisualizer);
+    audioPlayer.addEventListener('ended', stopVisualizer);
+    
+    const stepsSlider = document.getElementById('inference-steps');
+    const stepsDisplay = document.getElementById('steps-display');
+    
+    // Add new script for handling noise controls
+    const enableNoise = document.getElementById('enable-noise');
+    const noiseControls = document.getElementById('noise-controls');
+    const noiseOffset = document.getElementById('noise-offset');
+    const noiseStd = document.getElementById('noise-std');
+    const offsetDisplay = document.getElementById('offset-display');
+    const stdDisplay = document.getElementById('std-display');
+    
+    // Toggle noise controls visibility
+    enableNoise.addEventListener('change', function() {
+        noiseControls.classList.toggle('active', this.checked);
+    });
+    
+    // Update value displays
+    function updateValueDisplay(input, display) {
+        display.textContent = input.value;
+    }
+    
+    document.getElementById('inference-steps').addEventListener('input', function() {
+        updateValueDisplay(this, stepsDisplay);
+    });
+    
+    noiseOffset.addEventListener('input', function() {
+        updateValueDisplay(this, offsetDisplay);
+    });
+    
+    noiseStd.addEventListener('input', function() {
+        updateValueDisplay(this, stdDisplay);
+    });
+    
+    // Initialize value displays
+    updateValueDisplay(document.getElementById('inference-steps'), stepsDisplay);
+    updateValueDisplay(noiseOffset, offsetDisplay);
+    updateValueDisplay(noiseStd, stdDisplay);
+</script>
+{% endblock %} 
