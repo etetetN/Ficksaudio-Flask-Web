@@ -120,7 +120,8 @@ def process():
                 'total': 0,
                 'result': None,
                 'error': None,
-                'done': False
+                'done': False,
+                'filepath': filepath
             }
             
             #Start processing in a background thread
@@ -151,6 +152,7 @@ def process_audio_task(task_id, filepath, inference_steps, enable_noise, noise_o
         if task_id in background_tasks:
             background_tasks[task_id]['status'] = 'processing'
             background_tasks[task_id]['message'] = 'Starting audio processing'
+            background_tasks[task_id]['filepath'] = filepath  # Store the input filepath
             print(f"Beginning processing for task {task_id}")
         
         # Set up a function to sync processor progress to task status
@@ -403,8 +405,14 @@ def task_result():
     cleanup_thread.start()
     
     # Prepare file paths for template rendering
-    original_audio = os.path.basename(result['original_audio_path'])
-    original_audio = f"cache/uploads/{original_audio}"
+    # Get the original filepath that was processed for this task
+    original_file_path = task_data.get('filepath', '')
+    if original_file_path:
+        original_audio = os.path.basename(original_file_path)
+        original_audio = f"cache/uploads/{original_audio}"
+    else:
+        # Fallback if filepath wasn't stored
+        original_audio = "cache/uploads/unknown_original.wav" 
     enhanced_audio = result['enhanced_audio_path']
     
     # Render results page with all processed audio data and visualizations
