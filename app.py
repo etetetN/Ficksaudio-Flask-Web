@@ -79,6 +79,14 @@ def process():
     if request.method == 'POST':
         cleanup_old_files()  #Clean temporary files before processing new ones
         
+        # Clear any previous processing progress data
+        if 'task_id' in session:
+            old_task_id = session.pop('task_id')
+            # Remove old task from background_tasks if it exists
+            if old_task_id in background_tasks:
+                background_tasks.pop(old_task_id, None)
+                print(f"Cleared previous task: {old_task_id}")
+        
         #Verify the file was included in the request
         if 'audio_file' not in request.files:
             flash('No file part', 'error')
@@ -333,15 +341,30 @@ def progress_status():
     timestamp = int(time.time() * 1000)
     
     if not task_id or task_id not in background_tasks:
-        # No task ID or task not found
-        return jsonify({
-            'status': 'unknown',
-            'message': 'No active processing task found',
-            'current': 0,
-            'total': 0,
-            'done': False,
-            'timestamp': timestamp
-        })
+        # No task ID or task not found - check processor state directly
+        # This handles cases where the audio processor might have been reset
+        processor_progress = get_audio_processor().get_progress()
+        
+        # If processor shows active progress but we have no task, create a default task status
+        if processor_progress.get('current', 0) > 0 or processor_progress.get('done', False):
+            return jsonify({
+                'status': 'processing',
+                'message': processor_progress.get('message', 'Processing in background...'),
+                'current': processor_progress.get('current', 0),
+                'total': processor_progress.get('total', 100),
+                'done': processor_progress.get('done', False),
+                'timestamp': timestamp
+            })
+        else:
+            # No active processing detected
+            return jsonify({
+                'status': 'unknown',
+                'message': 'No active processing task found',
+                'current': 0,
+                'total': 0,
+                'done': False,
+                'timestamp': timestamp
+            })
     
     task_data = background_tasks[task_id].copy()
     
@@ -428,7 +451,23 @@ def task_result():
 @app.route('/process_page')
 def process_page():
     """Show processing page with progress updates"""
-    return render_template('process.html', title='Processing Audio', processing=True)
+    task_id = session.get('task_id')
+    
+    # Check if we have an active task that's been properly initialized
+    if task_id and task_id in background_tasks:
+        # Valid task exists, show processing page
+        return render_template('process.html', title='Processing Audio', processing=True)
+    
+    # Check if we came from a redirect (e.g., from the upload form)
+    # We only want to redirect to the upload page if the user accessed this URL directly without an active task
+    if request.referrer and ('process' in request.referrer or 'result' in request.referrer):
+        # Came from a valid source, allow access to the processing page 
+        # This helps in cases where task_id exists but isn't in background_tasks yet
+        return render_template('process.html', title='Processing Audio', processing=True)
+    
+    # No valid task, redirect to upload page with a message
+    flash('No active processing task found. Please upload a file first.', 'warning')
+    return redirect(url_for('process'))
 
 @app.route('/enhance', methods=['POST'])
 def enhance_audio():

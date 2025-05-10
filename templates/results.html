@@ -41,20 +41,30 @@
             </div>
             
             <div class="visualization-tabs">
-                <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="original-waveform">Waveform</button>
-                    <button class="tab-btn" data-tab="original-spectrogram">Spectrogram</button>
+                <div class="toggle-container">
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="original-viz-toggle" class="viz-toggle">
+                        <label for="original-viz-toggle">
+                            <span class="toggle-text-left">Waveform</span>
+                            <span class="toggle-text-right">Spectrogram</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="tab-content" id="original-waveform">
-                    <canvas id="original-waveform-canvas"></canvas>
-                    <div class="visualization-loading" id="original-waveform-loading">
-                        <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                
+                <div class="tab-content active" id="original-waveform">
+                    <div class="visualization-container">
+                        <canvas id="original-waveform-canvas"></canvas>
+                        <div class="visualization-loading" id="original-waveform-loading">
+                            <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                        </div>
                     </div>
                 </div>
                 <div class="tab-content" id="original-spectrogram">
-                    <canvas id="original-spectrogram-canvas"></canvas>
-                    <div class="visualization-loading" id="original-spectrogram-loading">
-                        <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                    <div class="visualization-container">
+                        <canvas id="original-spectrogram-canvas"></canvas>
+                        <div class="visualization-loading" id="original-spectrogram-loading">
+                            <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -100,20 +110,30 @@
             </div>
             
             <div class="visualization-tabs">
-                <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="fixed-waveform">Waveform</button>
-                    <button class="tab-btn" data-tab="fixed-spectrogram">Spectrogram</button>
+                <div class="toggle-container">
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="enhanced-viz-toggle" class="viz-toggle">
+                        <label for="enhanced-viz-toggle">
+                            <span class="toggle-text-left">Waveform</span>
+                            <span class="toggle-text-right">Spectrogram</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="tab-content" id="fixed-waveform">
-                    <canvas id="fixed-waveform-canvas"></canvas>
-                    <div class="visualization-loading" id="enhanced-waveform-loading">
-                        <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                
+                <div class="tab-content active" id="fixed-waveform">
+                    <div class="visualization-container">
+                        <canvas id="fixed-waveform-canvas"></canvas>
+                        <div class="visualization-loading" id="enhanced-waveform-loading">
+                            <i class="fas fa-spinner fa-spin"></i> Generating waveform...
+                        </div>
                     </div>
                 </div>
                 <div class="tab-content" id="fixed-spectrogram">
-                    <canvas id="fixed-spectrogram-canvas"></canvas>
-                    <div class="visualization-loading" id="enhanced-spectrogram-loading">
-                        <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                    <div class="visualization-container">
+                        <canvas id="fixed-spectrogram-canvas"></canvas>
+                        <div class="visualization-loading" id="enhanced-spectrogram-loading">
+                            <i class="fas fa-spinner fa-spin"></i> Generating spectrogram...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -137,257 +157,830 @@
         <p>This is an experimental model for AI enthusiasts. Results may vary.</p>
     </div>
 </section>
+
+<style>
+/* Fix for visualization containers */
+.result-card {
+    width: 100%;
+    max-width: 600px;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.visualization-container {
+    width: 100%;
+    height: 250px;
+    position: relative;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 10px;
+    background-color: rgba(30, 30, 50, 0.2);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.visualization-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
+
+.tab-content {
+    display: none;
+    width: 100%;
+    height: 250px;
+    margin: 15px 0;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.visualization-loading, 
+.visualization-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 100%;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+}
+
+/* Stylish toggle switch */
+.toggle-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 210px;
+    height: 36px;
+    margin: 0 auto;
+}
+
+.toggle-switch input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    overflow: hidden;
+    cursor: pointer;
+    border-radius: 18px;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: all 0.4s ease;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2), inset 0 0 5px rgba(255, 255, 255, 0.1);
+}
+
+.toggle-switch label:before {
+    content: "";
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50%;
+    height: 32px;
+    margin: 2px;
+    border-radius: 16px;
+    background: linear-gradient(45deg, #4A6FA5, #6A8EC8);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.4s ease;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+}
+
+/* Text labels are separate elements */
+.toggle-switch .toggle-text-left,
+.toggle-switch .toggle-text-right {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50%;
+    height: 100%;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 2;
+    transition: color 0.3s ease;
+}
+
+.toggle-switch .toggle-text-left {
+    left: 0;
+}
+
+.toggle-switch .toggle-text-right {
+    right: 0;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.toggle-switch input:checked + label:before {
+    transform: translateX(100%);
+}
+
+.toggle-switch input:checked + label .toggle-text-left {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.toggle-switch input:checked + label .toggle-text-right {
+    color: white;
+}
+
+.original-audio .toggle-switch label:before {
+    background: linear-gradient(45deg, #4A6FA5, #6A8EC8);
+}
+
+.enhanced-audio .toggle-switch label:before {
+    background: linear-gradient(45deg, #ff5797, #ff7bac);
+}
+
+/* Remove old tab styling */
+.tab-buttons {
+    display: none;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    //Visualization cache to improve performance
-    const visualizationCache = {};
-    
-    //Initialize visualizations when page loads
-    window.addEventListener('load', () => {
-        //Pre-render all visualizations for better performance
-        preRenderVisualizations();
+    // Wait for the DOM to fully load first
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM loaded, initializing visualizations");
         
-        //Draw initial views (waveforms)
-        drawCachedVisualization('original-waveform-canvas', visualizationCache.originalWaveform);
-        drawCachedVisualization('fixed-waveform-canvas', visualizationCache.enhancedWaveform);
+        // Audio elements
+        const originalAudio = document.getElementById('original-audio');
+        const enhancedAudio = document.getElementById('enhanced-audio');
+        const originalVisualizer = document.querySelectorAll('#original-visualizer .visualizer-bar');
+        const enhancedVisualizer = document.querySelectorAll('#enhanced-visualizer .visualizer-bar');
         
-        //Hide loading indicators once visualizations are ready
-        document.querySelectorAll('.visualization-loading').forEach(loader => {
-            loader.style.display = 'none';
-        });
-    });
-    
-    //Pre-render visualizations to optimize performance
-    function preRenderVisualizations() {
-        const waveformWidth = 800;
-        const waveformHeight = 200;
-        
-        //Pre-render waveforms for both original and enhanced audio
-        visualizationCache.originalWaveform = renderWaveform(
-            {{ original_waveform|tojson }},
-            'rgb(74, 111, 165)',
-            waveformWidth,
-            waveformHeight
-        );
-        
-        visualizationCache.enhancedWaveform = renderWaveform(
-            {{ enhanced_waveform|tojson }},
-            'rgb(255, 87, 151)',
-            waveformWidth,
-            waveformHeight
-        );
-        
-        //Pre-render spectrograms for both original and enhanced audio
-        visualizationCache.originalSpectrogram = renderSpectrogram(
-            {{ original_spectrogram|tojson }},
-            'rgb(74, 111, 165)',
-            waveformWidth,
-            waveformHeight
-        );
-        
-        visualizationCache.enhancedSpectrogram = renderSpectrogram(
-            {{ enhanced_spectrogram|tojson }},
-            'rgb(255, 87, 151)',
-            waveformWidth,
-            waveformHeight
-        );
-    }
-    
-    //Tab switching functionality for visualization types
-    document.querySelectorAll('.tab-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            const tabsContainer = button.parentElement;
-            const contentContainer = tabsContainer.nextElementSibling;
-            const tabToShow = button.getAttribute('data-tab');
-            
-            //Update active tab button
-            tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            button.classList.add('active');
-            
-            //Show corresponding tab content
-            contentContainer.parentElement.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(tabToShow).classList.add('active');
-            
-            //Draw visualization if it's a spectrogram tab
-            if (tabToShow === 'original-spectrogram') {
-                drawCachedVisualization('original-spectrogram-canvas', visualizationCache.originalSpectrogram);
-            } else if (tabToShow === 'fixed-spectrogram') {
-                drawCachedVisualization('fixed-spectrogram-canvas', visualizationCache.enhancedSpectrogram);
-            }
-        });
-    });
-    
-    //Draw a pre-rendered visualization onto a canvas
-    function drawCachedVisualization(canvasId, cachedVisual) {
-        if (!cachedVisual) return;
-        
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        canvas.width = cachedVisual.width;
-        canvas.height = cachedVisual.height;
-        ctx.drawImage(cachedVisual, 0, 0);
-    }
-    
-    //Render waveform visualization
-    function renderWaveform(waveformData, color, width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        
-        //Clear canvas
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        ctx.fillRect(0, 0, width, height);
-        
-        //Set wave style
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = color;
-        
-        //Calculate scaling factors
-        const verticalCenter = height / 2;
-        const verticalScale = height / 2.5;
-        const horizontalScale = width / waveformData.length;
-        
-        //Begin drawing waveform path
-        ctx.beginPath();
-        ctx.moveTo(0, verticalCenter);
-        
-        //Draw waveform points
-        for (let i = 0; i < waveformData.length; i++) {
-            const x = i * horizontalScale;
-            const y = verticalCenter + waveformData[i] * verticalScale;
-            ctx.lineTo(x, y);
-        }
-        
-        //Stroke the path
-        ctx.stroke();
-        
-        //Add a subtle glow effect
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 5;
-        ctx.stroke();
-        
-        return canvas;
-    }
-    
-    //Render spectrogram visualization
-    function renderSpectrogram(spectrogramData, color, width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        
-        //Clear canvas
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        ctx.fillRect(0, 0, width, height);
-        
-        //Get data dimensions
-        const numRows = spectrogramData.length;
-        const numCols = spectrogramData[0].length;
-        
-        //Calculate pixel size
-        const pixelWidth = width / numCols;
-        const pixelHeight = height / numRows;
-        
-        //Draw spectrogram
-        for (let i = 0; i < numRows; i++) {
-            for (let j = 0; j < numCols; j++) {
-                const value = spectrogramData[i][j];
-                const intensity = value * 255;
-                
-                //Create a gradient color based on intensity
-                const r = parseInt(color.match(/\d+/g)[0]);
-                const g = parseInt(color.match(/\d+/g)[1]);
-                const b = parseInt(color.match(/\d+/g)[2]);
-                
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${value})`;
-                ctx.fillRect(j * pixelWidth, height - (i + 1) * pixelHeight, pixelWidth, pixelHeight);
-            }
-        }
-        
-        return canvas;
-    }
-    
-    //Audio playback visualization
-    const originalAudio = document.getElementById('original-audio');
-    const enhancedAudio = document.getElementById('enhanced-audio');
-    const originalVisualizer = document.querySelectorAll('#original-visualizer .visualizer-bar');
-    const enhancedVisualizer = document.querySelectorAll('#enhanced-visualizer .visualizer-bar');
-    
-    //Handle audio loading events
-    ['original-audio', 'enhanced-audio'].forEach(id => {
-        const audio = document.getElementById(id);
-        const loading = document.getElementById(id.replace('audio', 'loading'));
-        const error = document.getElementById(id.replace('audio', 'error'));
-        
-        //Handle loading states
-        audio.addEventListener('loadstart', () => {
-            loading.style.display = 'flex';
+        // Hide error messages
+        document.querySelectorAll('.error-message').forEach(function(error) {
             error.style.display = 'none';
         });
         
-        audio.addEventListener('canplaythrough', () => {
-            loading.style.display = 'none';
-        });
+        // Set up audio event handlers
+        setupAudioPlayer('original-audio');
+        setupAudioPlayer('enhanced-audio');
         
-        audio.addEventListener('error', () => {
-            loading.style.display = 'none';
-            error.style.display = 'flex';
-        });
-    });
-    
-    //Animate visualizer bars during audio playback
-    function animateVisualizer(visualizerBars, isPlaying) {
-        visualizerBars.forEach(bar => {
-            if (isPlaying) {
-                const height = Math.floor(Math.random() * 80) + 10;
-                bar.style.height = `${height}%`;
-            } else {
-                bar.style.height = '10%';
+        // Set up toggle switches
+        setupToggleSwitches();
+        
+        // Set up audio visualizers
+        setupAudioVisualizers();
+        
+        // Ensure the DOM is fully rendered and display is calculated before initializing visualizations
+        // This is critical for proper canvas dimensions
+        function initVisualizations() {
+            console.log("Preparing to render visualizations...");
+            
+            // Force display of visualization containers to ensure dimensions are calculated
+            document.querySelectorAll('.visualization-container').forEach(function(container) {
+                container.style.display = 'block';
+                container.style.width = '100%';
+                container.style.height = '250px';
+                container.style.position = 'relative';
+                container.style.overflow = 'hidden';
+            });
+            
+            // Force browser to calculate layout
+            document.body.offsetHeight;
+            
+            console.log("Visualization containers prepared, rendering in 1 second...");
+            
+            // Delay visualization rendering to ensure DOM is fully rendered
+            setTimeout(renderVisualizations, 1000);
+        }
+        
+        // Handle the actual visualization rendering
+        function renderVisualizations() {
+            try {
+                console.log("Starting visualization rendering...");
+                
+                // Use global variables to avoid template parsing issues
+                var waveformData = {
+                    original: null,
+                    enhanced: null
+                };
+                var spectrogramData = {
+                    original: null,
+                    enhanced: null
+                };
+                
+                // Assign the data from template (these will be filled by Jinja2)
+                try {
+                    waveformData.original = {{ original_waveform|tojson }};
+                    waveformData.enhanced = {{ enhanced_waveform|tojson }};
+                    spectrogramData.original = {{ original_spectrogram|tojson }};
+                    spectrogramData.enhanced = {{ enhanced_spectrogram|tojson }};
+                } catch (e) {
+                    console.error("Error parsing data from template:", e);
+                }
+                
+                console.log("Loaded visualization data:", {
+                    originalWaveform: waveformData.original ? "Present" : "Missing",
+                    enhancedWaveform: waveformData.enhanced ? "Present" : "Missing",
+                    originalSpectrogram: spectrogramData.original ? "Present" : "Missing",
+                    enhancedSpectrogram: spectrogramData.enhanced ? "Present" : "Missing"
+                });
+                
+                // Draw waveforms (these usually work fine)
+                drawWaveform('original-waveform-canvas', waveformData.original, 'rgb(74, 111, 165)');
+                drawWaveform('fixed-waveform-canvas', waveformData.enhanced, 'rgb(255, 87, 151)');
+                
+                // Ensure spectrograms have valid data before attempting to render
+                console.log("Original spectrogram data:", spectrogramData.original);
+                console.log("Enhanced spectrogram data:", spectrogramData.enhanced);
+                
+                // Draw spectrograms with extra validation
+                if (spectrogramData.original) {
+                    drawSpectrogram('original-spectrogram-canvas', spectrogramData.original, 'rgb(74, 111, 165)');
+                } else {
+                    console.error("No original spectrogram data available");
+                    const loadingEl = document.getElementById('original-spectrogram-loading');
+                    if (loadingEl) {
+                        loadingEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Spectrogram data unavailable';
+                    }
+                }
+                
+                if (spectrogramData.enhanced) {
+                    drawSpectrogram('fixed-spectrogram-canvas', spectrogramData.enhanced, 'rgb(255, 87, 151)');
+                } else {
+                    console.error("No enhanced spectrogram data available");
+                    const loadingEl = document.getElementById('enhanced-spectrogram-loading');
+                    if (loadingEl) {
+                        loadingEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Spectrogram data unavailable';
+                    }
+                }
+                
+                // Hide all general loading indicators
+                document.querySelectorAll('.visualization-loading').forEach(function(loader) {
+                    if (!loader.innerHTML.includes('unavailable')) {
+                        loader.style.display = 'none';
+                    }
+                });
+                
+                console.log("Visualizations rendering completed");
+            } catch (error) {
+                console.error("Error rendering visualizations:", error);
+                document.querySelectorAll('.visualization-loading').forEach(function(loader) {
+                    loader.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Visualization failed';
+                    loader.style.color = '#ff5757';
+                    loader.style.display = 'flex';
+                });
             }
-        });
-    }
-    
-    //Handle visualizer animation for original audio
-    let originalInterval;
-    originalAudio.addEventListener('play', () => {
-        clearInterval(originalInterval);
-        originalInterval = setInterval(() => animateVisualizer(originalVisualizer, true), 100);
-    });
-    
-    originalAudio.addEventListener('pause', () => {
-        clearInterval(originalInterval);
-        animateVisualizer(originalVisualizer, false);
-    });
-    
-    originalAudio.addEventListener('ended', () => {
-        clearInterval(originalInterval);
-        animateVisualizer(originalVisualizer, false);
-    });
-    
-    //Handle visualizer animation for enhanced audio
-    let enhancedInterval;
-    enhancedAudio.addEventListener('play', () => {
-        clearInterval(enhancedInterval);
-        enhancedInterval = setInterval(() => animateVisualizer(enhancedVisualizer, true), 100);
-    });
-    
-    enhancedAudio.addEventListener('pause', () => {
-        clearInterval(enhancedInterval);
-        animateVisualizer(enhancedVisualizer, false);
-    });
-    
-    enhancedAudio.addEventListener('ended', () => {
-        clearInterval(enhancedInterval);
-        animateVisualizer(enhancedVisualizer, false);
+        }
+        
+        // Start the visualization initialization process
+        initVisualizations();
+        
+        // Set up audio player with proper event handling
+        function setupAudioPlayer(audioId) {
+            const audio = document.getElementById(audioId);
+            const loading = document.getElementById(audioId.replace('audio', 'loading'));
+            const error = document.getElementById(audioId.replace('audio', 'error'));
+            
+            if (!audio || !loading || !error) return;
+            
+            // Set initial states
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            
+            // Handle loading states
+            audio.addEventListener('loadstart', function() {
+                loading.style.display = 'flex';
+                error.style.display = 'none';
+            });
+            
+            audio.addEventListener('canplaythrough', function() {
+                loading.style.display = 'none';
+                error.style.display = 'none';
+            });
+            
+            audio.addEventListener('error', function(e) {
+                console.error(`Error loading ${audioId}:`, e);
+                loading.style.display = 'none';
+                error.style.display = 'flex';
+            });
+            
+            // Failsafe: hide loading after 3 seconds if other events don't fire
+            setTimeout(function() {
+                if (audio.readyState >= 2 || !audio.paused) {
+                    loading.style.display = 'none';
+                }
+            }, 3000);
+        }
+        
+        // Set up toggle switches for visualization type
+        function setupToggleSwitches() {
+            // Original audio visualization toggle
+            const originalToggle = document.getElementById('original-viz-toggle');
+            originalToggle.addEventListener('change', function() {
+                const waveformTab = document.getElementById('original-waveform');
+                const spectrogramTab = document.getElementById('original-spectrogram');
+                
+                if (this.checked) {
+                    // Show spectrogram
+                    waveformTab.classList.remove('active');
+                    spectrogramTab.classList.add('active');
+                } else {
+                    // Show waveform
+                    spectrogramTab.classList.remove('active');
+                    waveformTab.classList.add('active');
+                }
+            });
+            
+            // Enhanced audio visualization toggle
+            const enhancedToggle = document.getElementById('enhanced-viz-toggle');
+            enhancedToggle.addEventListener('change', function() {
+                const waveformTab = document.getElementById('fixed-waveform');
+                const spectrogramTab = document.getElementById('fixed-spectrogram');
+                
+                if (this.checked) {
+                    // Show spectrogram
+                    waveformTab.classList.remove('active');
+                    spectrogramTab.classList.add('active');
+                } else {
+                    // Show waveform
+                    spectrogramTab.classList.remove('active');
+                    waveformTab.classList.add('active');
+                }
+            });
+        }
+        
+        // Draw a waveform visualization
+        function drawWaveform(canvasId, waveformData, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.error(`Canvas element not found: ${canvasId}`);
+                return;
+            }
+            
+            // Get the parent container dimensions
+            const container = canvas.closest('.visualization-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Set canvas size to match container (for proper display)
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            
+            // Set higher resolution for better quality
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error("Could not get canvas context");
+                return;
+            }
+            
+            // Clear canvas with a nice background
+            ctx.fillStyle = 'rgba(30, 30, 50, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Extract the waveform data
+            let dataPoints = [];
+            if (waveformData && waveformData.data) {
+                dataPoints = waveformData.data;
+            } else if (Array.isArray(waveformData)) {
+                dataPoints = waveformData;
+            } else {
+                console.error("Invalid waveform data format", waveformData);
+                // Create fallback sine wave if data is invalid
+                dataPoints = createFallbackWaveform(100);
+            }
+            
+            if (dataPoints.length === 0) {
+                console.error("No waveform data points available");
+                // Create fallback sine wave if no data points
+                dataPoints = createFallbackWaveform(100);
+            }
+            
+            // Set up drawing
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = color;
+            ctx.lineJoin = 'round';
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Calculate scaling factors
+            const verticalCenter = canvas.height / 2;
+            const verticalScale = canvas.height / 3;
+            const horizontalScale = canvas.width / dataPoints.length;
+            
+            // Draw the waveform
+            ctx.beginPath();
+            ctx.moveTo(0, verticalCenter);
+            
+            for (let i = 0; i < dataPoints.length; i++) {
+                const x = i * horizontalScale;
+                // Ensure the data point is a number and in range
+                let dataPoint = typeof dataPoints[i] === 'number' ? dataPoints[i] : 0;
+                dataPoint = Math.max(-1, Math.min(1, dataPoint)); // Clamp between -1 and 1
+                
+                const y = verticalCenter + dataPoint * verticalScale;
+                ctx.lineTo(x, y);
+            }
+            
+            // Add glow effect
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+        }
+        
+        // Draw a spectrogram visualization
+        function drawSpectrogram(canvasId, spectrogramData, color) {
+            console.log(`Drawing spectrogram for ${canvasId}`);
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.error(`Canvas element not found: ${canvasId}`);
+                return;
+            }
+            
+            // Get the parent container dimensions
+            const container = canvas.closest('.visualization-container');
+            
+            // Log container dimensions for debugging
+            console.log(`Container dimensions for ${canvasId}: ${container.clientWidth}x${container.clientHeight}`);
+            
+            // Force container to show with minimum dimensions if it's hidden or not fully rendered
+            if (container.clientWidth <= 10 || container.clientHeight <= 10) {
+                console.log(`Container for ${canvasId} has invalid dimensions, applying defaults`);
+                
+                // Set minimum dimensions on the container
+                container.style.width = '100%';
+                container.style.height = '250px';
+                container.style.display = 'block';
+                container.style.position = 'relative';
+                
+                // Force a reflow to apply the dimensions
+                container.offsetHeight;
+            }
+            
+            // Get dimensions again after forcing display
+            const width = Math.max(500, container.clientWidth || 500);
+            const height = Math.max(250, container.clientHeight || 250);
+            
+            console.log(`Using dimensions for ${canvasId}: ${width}x${height}`);
+            
+            // Set canvas size to match container (for proper display)
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            
+            // Set higher resolution for better quality
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error("Could not get canvas context");
+                return;
+            }
+            
+            // Enable high quality rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Use a gradient background
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGradient.addColorStop(0, 'rgba(30, 30, 50, 0.3)');
+            bgGradient.addColorStop(1, 'rgba(30, 30, 50, 0.1)');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Log the input data structure for debugging
+            console.log(`Spectrogram data for ${canvasId}:`, spectrogramData);
+            
+            // Extract spectrogram data with better handling
+            let specData = [];
+            
+            // Try different ways to extract data based on observed structures
+            if (spectrogramData && typeof spectrogramData === 'object') {
+                if (spectrogramData.data && Array.isArray(spectrogramData.data)) {
+                    // Format: { data: [...], min: x, max: y }
+                    specData = spectrogramData.data;
+                    console.log(`Found data array with length: ${specData.length}`);
+                } else if (Array.isArray(spectrogramData)) {
+                    // Direct array format
+                    specData = spectrogramData;
+                    console.log(`Using direct array with length: ${specData.length}`);
+                } else {
+                    // Try to parse JSON if it's a string
+                    try {
+                        if (typeof spectrogramData === 'string') {
+                            const parsed = JSON.parse(spectrogramData);
+                            if (parsed.data) {
+                                specData = parsed.data;
+                                console.log(`Parsed JSON data with length: ${specData.length}`);
+                            } else if (Array.isArray(parsed)) {
+                                specData = parsed;
+                                console.log(`Parsed JSON array with length: ${specData.length}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error parsing spectrogram data: ${e}`);
+                    }
+                }
+            }
+            
+            // If we still don't have valid data, create a fallback
+            if (!Array.isArray(specData) || specData.length === 0) {
+                console.warn(`No valid data found for ${canvasId}, using fallback pattern`);
+                specData = createFallbackSpectrogram(30, 50);
+                
+                // Show error message in the visualization container
+                const loadingEl = canvas.closest('.visualization-container').querySelector('.visualization-loading');
+                if (loadingEl) {
+                    loadingEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> No spectrogram data available';
+                    loadingEl.style.display = 'flex';
+                }
+            } else {
+                // Hide loading indicator
+                const loadingEl = canvas.closest('.visualization-container').querySelector('.visualization-loading');
+                if (loadingEl) {
+                    loadingEl.style.display = 'none';
+                }
+            }
+            
+            // Parse color components
+            const colorMatch = color.match(/\d+/g);
+            if (!colorMatch || colorMatch.length < 3) {
+                console.error("Invalid color format:", color);
+                return;
+            }
+            
+            const r = parseInt(colorMatch[0]);
+            const g = parseInt(colorMatch[1]);
+            const b = parseInt(colorMatch[2]);
+            
+            // Get dimensions and scaling
+            const numRows = specData.length;
+            let numCols = 0;
+            
+            // Check if the first row is an array (2D array structure)
+            if (Array.isArray(specData[0])) {
+                numCols = specData[0].length;
+            } else {
+                // Handle 1D array case - create a simple visual representation
+                // Treat the 1D array as a single row
+                numCols = specData.length;
+                specData = [specData]; // Convert to 2D array with one row
+            }
+            
+            console.log(`Rendering spectrogram with dimensions: ${numRows} rows x ${numCols} columns`);
+            
+            if (numCols === 0) {
+                console.error("No spectrogram columns to draw");
+                return;
+            }
+            
+            // Calculate pixel size for drawing
+            const pixelWidth = canvas.width / numCols;
+            const pixelHeight = canvas.height / numRows;
+            
+            // Get min/max values for normalization or use defaults
+            let min = 0;
+            let max = 1;
+            
+            if (spectrogramData && typeof spectrogramData.min === 'number') {
+                min = spectrogramData.min;
+            }
+            
+            if (spectrogramData && typeof spectrogramData.max === 'number') {
+                max = spectrogramData.max;
+            }
+            
+            const range = max - min || 1; // Prevent division by zero
+            
+            // REVERTED DRAWING CODE FROM ORIGINAL VERSION
+            // Create an ImageData for better performance
+            try {
+                // Ensure canvas dimensions are valid
+                if (canvas.width <= 0 || canvas.height <= 0 || !isFinite(canvas.width) || !isFinite(canvas.height)) {
+                    console.error(`Invalid canvas dimensions: ${canvas.width}x${canvas.height}`);
+                    
+                    // Reset to minimum valid dimensions
+                    canvas.width = Math.max(1, Math.min(1000, container.clientWidth * 2));
+                    canvas.height = Math.max(1, Math.min(1000, container.clientHeight * 2));
+                    
+                    console.log(`Reset canvas dimensions to: ${canvas.width}x${canvas.height}`);
+                    
+                    // Redraw background with new dimensions
+                    ctx.fillStyle = bgGradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                
+                // Fallback to simpler rendering if dimensions are still problematic
+                if (canvas.width <= 0 || canvas.height <= 0) {
+                    throw new Error("Cannot create ImageData with invalid dimensions");
+                }
+                
+                const imageData = ctx.createImageData(canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                // Render each pixel of the spectrogram
+                for (let i = 0; i < numRows; i++) {
+                    const rowData = specData[i];
+                    if (!rowData) continue;
+                    
+                    for (let j = 0; j < numCols; j++) {
+                        // Skip if value is not a number
+                        const value = rowData[j];
+                        if (typeof value !== 'number') continue;
+                        
+                        // Normalize value between 0 and 1
+                        const normValue = Math.max(0, Math.min(1, (value - min) / range));
+                        
+                        // Apply gamma correction for better visibility
+                        const adjustedValue = Math.pow(normValue, 0.7);
+                        
+                        // Map to pixel position
+                        const x = Math.floor(j * pixelWidth);
+                        const y = Math.floor(canvas.height - (i + 1) * pixelHeight);
+                        
+                        // Draw all pixels in this segment
+                        for (let py = 0; py < Math.ceil(pixelHeight); py++) {
+                            for (let px = 0; px < Math.ceil(pixelWidth); px++) {
+                                const pixelPos = ((y + py) * canvas.width + (x + px)) * 4;
+                                
+                                // Skip if out of bounds
+                                if (pixelPos < 0 || pixelPos >= data.length - 3) continue;
+                                
+                                // Set color intensity based on value
+                                data[pixelPos] = Math.floor(r * adjustedValue);     // R
+                                data[pixelPos + 1] = Math.floor(g * adjustedValue); // G
+                                data[pixelPos + 2] = Math.floor(b * adjustedValue); // B
+                                data[pixelPos + 3] = 255; // Alpha (fully opaque)
+                            }
+                        }
+                    }
+                }
+                
+                // Put the image data on the canvas
+                ctx.putImageData(imageData, 0, 0);
+                
+                // Add a subtle glow effect
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 5;
+                ctx.fillStyle = 'rgba(0,0,0,0.01)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            catch (err) {
+                console.error(`Error rendering spectrogram with ImageData: ${err.message}`);
+                
+                // Fallback to simpler rendering
+                for (let i = 0; i < numRows; i++) {
+                    const rowData = specData[i];
+                    if (!rowData) continue;
+                    
+                    for (let j = 0; j < numCols; j++) {
+                        const value = rowData[j];
+                        if (typeof value !== 'number') continue;
+                        
+                        // Normalize value between 0 and 1
+                        const normValue = Math.max(0, Math.min(1, (value - min) / range));
+                        
+                        // Get a color based on the value
+                        const intensity = Math.floor(255 * Math.pow(normValue, 0.7));
+                        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${normValue.toFixed(2)})`;
+                        
+                        // Draw rectangle
+                        ctx.fillRect(
+                            j * pixelWidth, 
+                            canvas.height - (i + 1) * pixelHeight, 
+                            Math.max(1, pixelWidth), 
+                            Math.max(1, pixelHeight)
+                        );
+                    }
+                }
+            }
+            
+            console.log(`Spectrogram for ${canvasId} rendered successfully`);
+        }
+        
+        // Create a fallback waveform if data is missing
+        function createFallbackWaveform(length) {
+            console.log("Creating fallback waveform");
+            const data = [];
+            for (let i = 0; i < length; i++) {
+                // Create a sine wave
+                data.push(Math.sin(i / 5) * 0.5);
+            }
+            return data;
+        }
+        
+        // Create a fallback spectrogram pattern if data is missing
+        function createFallbackSpectrogram(rows, cols) {
+            console.log("Creating fallback spectrogram pattern");
+            rows = rows || 100; 
+            cols = cols || 200;
+            
+            const data = [];
+            // Create a more interesting pattern with multiple frequency components
+            for (let i = 0; i < rows; i++) {
+                const row = [];
+                for (let j = 0; j < cols; j++) {
+                    // Generate a pattern with multiple frequency components
+                    const val = 0.5 + 
+                                0.2 * Math.sin((i + j) / 10) +
+                                0.15 * Math.sin(i / 5) +
+                                0.15 * Math.cos(j / 8);
+                    
+                    // Ensure value is in valid range
+                    row.push(Math.max(0, Math.min(1, val)));
+                }
+                data.push(row);
+            }
+            
+            // Add some "features" to make it look more like a spectrogram
+            const centerRow = Math.floor(rows * 0.7);
+            const featureWidth = Math.floor(cols * 0.1);
+            
+            // Add a few "frequency bands"
+            for (let i = 0; i < 3; i++) {
+                const bandRow = Math.floor(rows * (0.3 + i * 0.2));
+                const bandWidth = Math.floor(rows * 0.05);
+                
+                for (let r = Math.max(0, bandRow - bandWidth); r < Math.min(rows, bandRow + bandWidth); r++) {
+                    for (let j = 0; j < cols; j++) {
+                        data[r][j] = Math.min(1, data[r][j] + 0.3 * Math.pow(Math.sin(j / 20), 2));
+                    }
+                }
+            }
+            
+            console.log(`Created fallback spectrogram: ${rows}x${cols}`);
+            return data;
+        }
+        
+        // Set up audio visualization
+        function setupAudioVisualizers() {
+            // Animate visualizer bars during audio playback
+            function animateVisualizer(visualizerBars, isPlaying) {
+                visualizerBars.forEach(function(bar) {
+                    if (isPlaying) {
+                        const height = Math.floor(Math.random() * 80) + 10;
+                        bar.style.height = `${height}%`;
+                    } else {
+                        bar.style.height = '10%';
+                    }
+                });
+            }
+            
+            // Set up original audio visualization
+            let originalInterval;
+            originalAudio.addEventListener('play', function() {
+                clearInterval(originalInterval);
+                originalInterval = setInterval(function() {
+                    animateVisualizer(originalVisualizer, true);
+                }, 100);
+            });
+            
+            originalAudio.addEventListener('pause', function() {
+                clearInterval(originalInterval);
+                animateVisualizer(originalVisualizer, false);
+            });
+            
+            originalAudio.addEventListener('ended', function() {
+                clearInterval(originalInterval);
+                animateVisualizer(originalVisualizer, false);
+            });
+            
+            // Set up enhanced audio visualization
+            let enhancedInterval;
+            enhancedAudio.addEventListener('play', function() {
+                clearInterval(enhancedInterval);
+                enhancedInterval = setInterval(function() {
+                    animateVisualizer(enhancedVisualizer, true);
+                }, 100);
+            });
+            
+            enhancedAudio.addEventListener('pause', function() {
+                clearInterval(enhancedInterval);
+                animateVisualizer(enhancedVisualizer, false);
+            });
+            
+            enhancedAudio.addEventListener('ended', function() {
+                clearInterval(enhancedInterval);
+                animateVisualizer(enhancedVisualizer, false);
+            });
+        }
     });
 </script>
 {% endblock %} 

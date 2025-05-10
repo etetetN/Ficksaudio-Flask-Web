@@ -85,6 +85,16 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Connecting to event source:', progressUrl);
         progressMessage.textContent = 'Connecting to server...';
         
+        // Reset progress UI to initial state
+        progressFill.style.width = '0%';
+        progressCount.textContent = '';
+        
+        // Reset step tracking
+        document.querySelectorAll('.step').forEach(function(step) {
+            step.classList.remove('active', 'completed');
+        });
+        document.getElementById('step-upload').classList.add('active');
+        
         // Create a new EventSource
         const eventSource = new EventSource(progressUrl);
         

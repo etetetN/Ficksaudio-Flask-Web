@@ -428,9 +428,9 @@ input:checked + .slider:before {
             
             <div class="processing-options">
                 <div class="option-group">
-                    <label for="inference-steps">Inference Steps <span class="value-display" id="steps-display">50</span></label>
+                    <label for="inference-steps">Inference Steps <span class="value-display" id="steps-display">20</span></label>
                     <input type="range" id="inference-steps" name="inference_steps" 
-                           min="20" max="100" value="50" step="1">
+                           min="20" max="100" value="20" step="1">
                     <small class="help-text">Higher values = better quality but slower processing</small>
                 </div>
 
@@ -560,7 +560,7 @@ input:checked + .slider:before {
             "Lower frequencies (bass sounds) appear at the bottom of spectrograms, while higher frequencies are at the top.",
             "Our model can help reduce background noise, hiss, and improve overall clarity.",
             "Bright spots in the enhanced spectrogram indicate stronger audio signals.",
-            "The neural network has over 30 million parameters that work together to enhance your audio.",
+            "The neural network has over 80 million parameters that work together to enhance your audio.",
             "Audio processing utilizes your computer's CPU and memory resources to run complex calculations."
         ];
         

@@ -498,16 +498,24 @@ class SHDMAudioProcessor:
                 - original_spectrogram: Spectrogram data of the original audio
                 - enhanced_spectrogram: Spectrogram data of the enhanced audio
         """
+        # Reset progress tracking for new processing session
+        self._reset_progress()
+        
         #Store inference steps
         self.inference_steps = max(20, min(100, inference_steps))
         
         try:
+            # Update initial progress message
+            self._update_progress(message=f"Processing audio: {os.path.basename(audio_path)}", current=0, total=100)
+            
             #Load and preprocess the audio
             audio_data, sample_rate = self._load_audio(audio_path)
+            self._update_progress(message="Audio loaded successfully", current=10, total=100)
             
             #Generate visualizations for the original audio
             original_waveform = self._generate_waveform(audio_data)
             original_spectrogram_data = self.convert_audio_to_spectrogram(audio_data)
+            self._update_progress(message="Generated original visualizations", current=20, total=100)
             
             #Apply noisy processing if enabled
             if enable_noise:
@@ -519,11 +527,13 @@ class SHDMAudioProcessor:
                     clip_min=-80.0,
                     clip_max=40.0
                 )
+                self._update_progress(message="Applied noise processing", current=30, total=100)
             
             original_spectrogram = self._process_spectrogram_for_visualization(original_spectrogram_data)
             
             #Apply the model to enhance the audio
             enhanced_audio, temp_path = self._enhance_audio(audio_data)
+            self._update_progress(message="Audio enhancement complete", current=90, total=100)
             
             #Generate visualizations for the enhanced audio
             enhanced_waveform = self._generate_waveform(enhanced_audio)
@@ -531,6 +541,7 @@ class SHDMAudioProcessor:
             
             #Process spectrogram for visualization
             enhanced_spectrogram = self._process_spectrogram_for_visualization(enhanced_spectrogram_data)
+            self._update_progress(message="Generated enhanced visualizations", current=95, total=100)
             
             #Save the enhanced audio
             enhanced_audio_path = self._save_enhanced_audio(enhanced_audio, audio_path, temp_path)
@@ -556,6 +567,9 @@ class SHDMAudioProcessor:
             
             print(f"Enhanced audio URL path: {enhanced_url_path}")
             
+            # Mark process as complete
+            self._update_progress(message="Processing complete!", current=100, total=100, done=True)
+            
             return {
                 'enhanced_audio_path': enhanced_url_path,
                 'original_waveform': original_waveform,
@@ -564,6 +578,8 @@ class SHDMAudioProcessor:
                 'enhanced_spectrogram': enhanced_spectrogram
             }
         except Exception as e:
+            # Mark process as failed
+            self._update_progress(message=f"Error processing audio: {str(e)}", done=True)
             print(f"Error in process_audio: {str(e)}")
             import traceback
             traceback.print_exc()
@@ -711,22 +727,79 @@ class SHDMAudioProcessor:
         
         print(f"Extracted 2D spectrogram with shape: {spec_2d.shape}")
         
-        #Downsample for visualization if needed
-        if spec_2d.shape[1] > 200:
-            indices = np.linspace(0, spec_2d.shape[1] - 1, 200, dtype=int)
-            spec_2d = spec_2d[:, indices]
+        # Ensure the spectrogram has enough data to be meaningful
+        if spec_2d.shape[0] < 10 or spec_2d.shape[1] < 10:
+            print(f"WARNING: Spectrogram is too small: {spec_2d.shape}")
+            # Create a fallback pattern
+            spec_2d = np.zeros((100, 200))
+            for i in range(100):
+                for j in range(200):
+                    spec_2d[i, j] = 0.5 + 0.5 * np.sin((i+j)/20.0)
         
-        if spec_2d.shape[0] > 200:
-            indices = np.linspace(0, spec_2d.shape[0] - 1, 200, dtype=int)
-            spec_2d = spec_2d[indices, :]
+        #Downsample for visualization if needed (improves performance)
+        target_height = 200
+        target_width = 200
+        
+        if spec_2d.shape[0] > target_height or spec_2d.shape[1] > target_width:
+            # Calculate downsample factors
+            height_factor = max(1, spec_2d.shape[0] // target_height)
+            width_factor = max(1, spec_2d.shape[1] // target_width)
+            
+            # Perform simple downsampling by taking every Nth point
+            downsampled = spec_2d[::height_factor, ::width_factor]
+            print(f"Downsampled spectrogram to shape: {downsampled.shape}")
+            spec_2d = downsampled
         
         #Ensure we don't have NaN or Inf values
         spec_2d = np.nan_to_num(spec_2d, nan=0.0, posinf=0.0, neginf=0.0)
         
+        # Calculate meaningful min/max values for better visualization
+        # Clip outliers for better visualization
+        valid_values = spec_2d[np.isfinite(spec_2d)]
+        if len(valid_values) > 0:
+            p_min = np.percentile(valid_values, 5)  # 5th percentile
+            p_max = np.percentile(valid_values, 95) # 95th percentile
+            
+            # Use percentiles but ensure some minimum range
+            min_val = min(p_min, np.min(valid_values) + 0.1 * (np.max(valid_values) - np.min(valid_values)))
+            max_val = max(p_max, np.max(valid_values) - 0.1 * (np.max(valid_values) - np.min(valid_values)))
+        else:
+            min_val = 0
+            max_val = 1
+        
+        # Convert to Python native types for JSON serialization
+        spec_data = spec_2d.tolist()
+        
+        # Verify data is valid for frontend rendering
+        valid_data = True
+        for row in spec_data:
+            if not isinstance(row, list):
+                valid_data = False
+                break
+            for val in row:
+                if not isinstance(val, (int, float)) or not np.isfinite(val):
+                    valid_data = False
+                    break
+        
+        if not valid_data:
+            print("WARNING: Invalid data detected in spectrogram, creating fallback pattern")
+            spec_data = []
+            for i in range(100):
+                row = []
+                for j in range(100):
+                    row.append(0.5 + 0.5 * np.sin((i+j)/20.0))
+                spec_data.append(row)
+            min_val = 0
+            max_val = 1
+        
+        # Print summary statistics
+        print(f"Spectrogram visualization data: {len(spec_data)} rows x {len(spec_data[0]) if spec_data else 0} columns")
+        print(f"Value range: {min_val} to {max_val}")
+        
         return {
-            'data': spec_2d.tolist(),
-            'max': float(np.max(spec_2d)),
-            'min': float(np.min(spec_2d))
+            'data': spec_data,
+            'max': float(max_val),
+            'min': float(min_val)
         }
     
     def _enhance_audio(self, audio_data: np.ndarray) -> Tuple[np.ndarray, str]:
